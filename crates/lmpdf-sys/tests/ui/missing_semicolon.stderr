@@ -1,0 +1,9 @@
+error: expected `;`
+ --> tests/ui/missing_semicolon.rs:1:1
+  |
+1 | / lmpdf_sys_macros::pdfium_ffi! {
+2 | |     fn Foo()
+3 | | }
+  | |_^
+  |
+  = note: this error originates in the macro `lmpdf_sys_macros::pdfium_ffi` (in Nightly builds, run with -Z macro-backtrace for more info)

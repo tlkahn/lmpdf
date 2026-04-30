@@ -10,9 +10,13 @@ libloading = "0.9"
 [build-dependencies]
 bindgen = "0.72"
 
+[dev-dependencies]
+trybuild = "1"
+
 [features]
 default = ["pdfium_latest"]
 pdfium_latest = ["pdfium_7811"]
 pdfium_7811 = []
 pdfium_7763 = []
 pdfium_7543 = []
+static = []

@@ -1,0 +1,10 @@
+error: proc macro panicked
+ --> tests/ui/invalid_since_version.rs:1:1
+  |
+1 | / lmpdf_sys_macros::pdfium_ffi! {
+2 | |     #[since(9999)]
+3 | |     fn Foo();
+4 | | }
+  | |_^
+  |
+  = help: message: Unknown pdfium version: 9999. Known versions: [7543, 7763, 7811]

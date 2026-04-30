@@ -2,6 +2,12 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+mod ffi;
+pub use ffi::*;
+
+mod library;
+pub use library::PdfiumLibrary;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,5 +88,27 @@ mod tests {
         let _b: FPDF_BOOL = 1;
         let _f: FS_FLOAT = 1.0;
         let _d: FPDF_DWORD = 0;
+    }
+
+    #[test]
+    fn trait_can_be_named_as_bound() {
+        fn accepts_bindings<T: PdfiumBindings>(_: &T) {}
+        let _ = accepts_bindings::<DynamicBindings>;
+    }
+
+    #[test]
+    fn dynamic_bindings_load_signature() {
+        fn check_signature(
+            _f: fn(libloading::Library) -> Result<DynamicBindings, libloading::Error>,
+        ) {
+        }
+        check_signature(DynamicBindings::load);
+    }
+
+    #[test]
+    fn pdfium_library_open_compiles() {
+        fn accepts_result(_: Result<PdfiumLibrary, libloading::Error>) {}
+        let r = PdfiumLibrary::open("/nonexistent/libpdfium.so");
+        accepts_result(r);
     }
 }

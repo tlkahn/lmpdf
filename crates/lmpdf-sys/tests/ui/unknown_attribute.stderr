@@ -1,0 +1,5 @@
+error: unknown attribute `version`, expected `since`
+ --> tests/ui/unknown_attribute.rs:2:7
+  |
+2 |     #[version(7543)]
+  |       ^^^^^^^
