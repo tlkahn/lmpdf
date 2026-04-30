@@ -1,0 +1,25 @@
+use std::path::Path;
+use std::sync::Arc;
+
+use lmpdf_sys::PdfiumLibrary;
+
+use crate::document::Document;
+use crate::error::{Error, LibraryError};
+
+pub struct Pdfium {
+    lib: Arc<PdfiumLibrary>,
+}
+
+impl Pdfium {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
+        let lib = PdfiumLibrary::open(path)
+            .map_err(|e| Error::Library(LibraryError::LoadFailed(e.to_string())))?;
+        Ok(Self {
+            lib: Arc::new(lib),
+        })
+    }
+
+    pub fn load_document(&self, data: &[u8], password: Option<&str>) -> Result<Document, Error> {
+        Document::from_bytes(self.lib.clone(), data, password)
+    }
+}

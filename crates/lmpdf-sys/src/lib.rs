@@ -5,6 +5,9 @@ include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 mod ffi;
 pub use ffi::*;
 
+mod safe;
+pub use safe::*;
+
 mod library;
 pub use library::PdfiumLibrary;
 
@@ -107,8 +110,14 @@ mod tests {
 
     #[test]
     fn pdfium_library_open_compiles() {
-        fn accepts_result(_: Result<PdfiumLibrary, libloading::Error>) {}
+        fn accepts_result(_: Result<PdfiumLibrary, SysError>) {}
         let r = PdfiumLibrary::open("/nonexistent/libpdfium.so");
         accepts_result(r);
+    }
+
+    #[test]
+    fn pdfium_library_exposes_safe_bindings() {
+        fn accepts<B: PdfiumBindings>(_: &SafeBindings<B>) {}
+        let _ = accepts::<DynamicBindings>;
     }
 }

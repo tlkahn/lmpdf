@@ -1,28 +1,26 @@
-use crate::{DynamicBindings, PdfiumBindings};
+use crate::{DynamicBindings, SafeBindings, SysError};
 
 pub struct PdfiumLibrary {
-    bindings: DynamicBindings,
+    bindings: SafeBindings<DynamicBindings>,
 }
 
 impl PdfiumLibrary {
-    pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self, libloading::Error> {
-        let lib = unsafe { libloading::Library::new(path.as_ref()) }?;
-        let bindings = DynamicBindings::load(lib)?;
-        unsafe {
-            bindings.FPDF_InitLibrary();
-        }
+    pub fn open(path: impl AsRef<std::path::Path>) -> Result<Self, SysError> {
+        let lib = unsafe { libloading::Library::new(path.as_ref()) }
+            .map_err(|e| SysError::LoadFailed(e.to_string()))?;
+        let raw = DynamicBindings::load(lib).map_err(|e| SysError::LoadFailed(e.to_string()))?;
+        let bindings = SafeBindings::new(raw);
+        bindings.init_library();
         Ok(Self { bindings })
     }
 
-    pub fn bindings(&self) -> &DynamicBindings {
+    pub fn bindings(&self) -> &SafeBindings<DynamicBindings> {
         &self.bindings
     }
 }
 
 impl Drop for PdfiumLibrary {
     fn drop(&mut self) {
-        unsafe {
-            self.bindings.FPDF_DestroyLibrary();
-        }
+        self.bindings.destroy_library();
     }
 }
