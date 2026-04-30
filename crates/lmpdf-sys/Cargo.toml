@@ -1,0 +1,18 @@
+[package]
+name = "lmpdf-sys"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+lmpdf-sys-macros = { path = "../lmpdf-sys-macros" }
+libloading = "0.9"
+
+[build-dependencies]
+bindgen = "0.72"
+
+[features]
+default = ["pdfium_latest"]
+pdfium_latest = ["pdfium_7811"]
+pdfium_7811 = []
+pdfium_7763 = []
+pdfium_7543 = []

@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - name: Install libclang (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - run: cargo build --workspace
+      - run: cargo test --workspace
+      - run: cargo clippy --workspace -- -D warnings
+      - run: cargo fmt --check
+
+  feature-matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        feature: [pdfium_7811, pdfium_7763, pdfium_7543]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install libclang
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - run: cargo test -p lmpdf-sys --no-default-features --features ${{ matrix.feature }}

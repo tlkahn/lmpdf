@@ -1,0 +1,20 @@
+[package]
+name = "lmpdf"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+lmpdf-sys = { path = "../lmpdf-sys" }
+slotmap = "1.1"
+bitflags = "2"
+
+[dependencies.image]
+version = "0.25"
+optional = true
+
+[features]
+default = ["pdfium_latest"]
+pdfium_latest = ["lmpdf-sys/pdfium_latest"]
+pdfium_7811 = ["lmpdf-sys/pdfium_7811"]
+pdfium_7763 = ["lmpdf-sys/pdfium_7763"]
+pdfium_7543 = ["lmpdf-sys/pdfium_7543"]

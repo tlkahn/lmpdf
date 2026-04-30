@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/lmpdf-sys-macros",
+    "crates/lmpdf-sys",
+    "crates/lmpdf",
+    "crates/lmpdf-bundle",
+]
+
+[workspace.package]
+edition = "2024"
