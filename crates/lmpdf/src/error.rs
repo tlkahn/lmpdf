@@ -187,15 +187,8 @@ mod tests {
 
     #[test]
     fn error_from_page_error() {
-        let e: Error = PageError::IndexOutOfBounds {
-            index: 0,
-            count: 1,
-        }
-        .into();
-        assert!(matches!(
-            e,
-            Error::Page(PageError::IndexOutOfBounds { .. })
-        ));
+        let e: Error = PageError::IndexOutOfBounds { index: 0, count: 1 }.into();
+        assert!(matches!(e, Error::Page(PageError::IndexOutOfBounds { .. })));
     }
 
     #[test]
@@ -216,12 +209,14 @@ mod tests {
     #[test]
     fn render_error_display() {
         assert!(!RenderError::BitmapCreationFailed.to_string().is_empty());
-        assert!(!RenderError::InvalidDimensions {
-            width: 0,
-            height: 0
-        }
-        .to_string()
-        .is_empty());
+        assert!(
+            !RenderError::InvalidDimensions {
+                width: 0,
+                height: 0
+            }
+            .to_string()
+            .is_empty()
+        );
         assert!(!RenderError::BufferCopyFailed.to_string().is_empty());
     }
 
@@ -247,11 +242,7 @@ mod tests {
             DocumentError::IncorrectPassword.into(),
             DocumentError::SecurityRestriction.into(),
             DocumentError::IoError("test".into()).into(),
-            PageError::IndexOutOfBounds {
-                index: 5,
-                count: 3,
-            }
-            .into(),
+            PageError::IndexOutOfBounds { index: 5, count: 3 }.into(),
             PageError::LoadFailed.into(),
             HandleError::CrossDocument.into(),
             HandleError::Stale.into(),

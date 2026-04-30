@@ -32,6 +32,11 @@ fn main() {
         let img = bitmap.to_image();
         let path = PathBuf::from(format!("{output_prefix}_page{}.jpg", i + 1));
         img.save(&path).expect("Failed to save image");
-        println!("Saved {} ({}x{})", path.display(), bitmap.width(), bitmap.height());
+        println!(
+            "Saved {} ({}x{})",
+            path.display(),
+            bitmap.width(),
+            bitmap.height()
+        );
     }
 }

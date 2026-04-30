@@ -52,7 +52,6 @@ impl Rotation {
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
     pub(crate) width: Option<u32>,
@@ -144,7 +143,11 @@ pub fn compute_target_dimensions(
     config: &RenderConfig,
 ) -> Result<(u32, u32), Error> {
     if page_w <= 0.0 || page_h <= 0.0 {
-        return Err(RenderError::InvalidDimensions { width: 0, height: 0 }.into());
+        return Err(RenderError::InvalidDimensions {
+            width: 0,
+            height: 0,
+        }
+        .into());
     }
 
     let (pw, ph) = if config.rotation.swaps_dimensions() {

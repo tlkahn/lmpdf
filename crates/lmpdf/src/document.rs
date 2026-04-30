@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use lmpdf_sys::{DocHandle, PageHandle, PdfiumLibrary};
 use slotmap::SlotMap;
@@ -144,14 +144,7 @@ impl Document {
             .create_bitmap(w as i32, h as i32, alpha)
             .map_err(|_| RenderError::BitmapCreationFailed)?;
 
-        bindings.bitmap_fill_rect(
-            bitmap,
-            0,
-            0,
-            w as i32,
-            h as i32,
-            config.background_color,
-        );
+        bindings.bitmap_fill_rect(bitmap, 0, 0, w as i32, h as i32, config.background_color);
 
         bindings.render_page_bitmap(
             bitmap,

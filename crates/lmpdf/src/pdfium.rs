@@ -14,9 +14,7 @@ impl Pdfium {
     pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
         let lib = PdfiumLibrary::open(path)
             .map_err(|e| Error::Library(LibraryError::LoadFailed(e.to_string())))?;
-        Ok(Self {
-            lib: Arc::new(lib),
-        })
+        Ok(Self { lib: Arc::new(lib) })
     }
 
     pub fn load_document(&self, data: &[u8], password: Option<&str>) -> Result<Document, Error> {

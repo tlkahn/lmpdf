@@ -104,7 +104,7 @@ impl fmt::Debug for Bitmap {
 #[cfg(feature = "image")]
 impl Bitmap {
     pub fn to_image(&self) -> image::DynamicImage {
-        use image::{DynamicImage, GrayImage, RgbaImage, RgbImage};
+        use image::{DynamicImage, GrayImage, RgbImage, RgbaImage};
 
         let w = self.width as usize;
         let h = self.height as usize;
@@ -118,9 +118,7 @@ impl Bitmap {
                     let start = row * stride;
                     buf.extend_from_slice(&self.data[start..start + w]);
                 }
-                DynamicImage::ImageLuma8(
-                    GrayImage::from_raw(self.width, self.height, buf).unwrap(),
-                )
+                DynamicImage::ImageLuma8(GrayImage::from_raw(self.width, self.height, buf).unwrap())
             }
             BitmapFormat::Bgr => {
                 let mut buf = Vec::with_capacity(w * h * 3);
@@ -130,12 +128,10 @@ impl Bitmap {
                         let px = row_start + col * bpp;
                         buf.push(self.data[px + 2]); // R
                         buf.push(self.data[px + 1]); // G
-                        buf.push(self.data[px]);      // B
+                        buf.push(self.data[px]); // B
                     }
                 }
-                DynamicImage::ImageRgb8(
-                    RgbImage::from_raw(self.width, self.height, buf).unwrap(),
-                )
+                DynamicImage::ImageRgb8(RgbImage::from_raw(self.width, self.height, buf).unwrap())
             }
             BitmapFormat::BgrX => {
                 let mut buf = Vec::with_capacity(w * h * 3);
@@ -145,12 +141,10 @@ impl Bitmap {
                         let px = row_start + col * bpp;
                         buf.push(self.data[px + 2]); // R
                         buf.push(self.data[px + 1]); // G
-                        buf.push(self.data[px]);      // B
+                        buf.push(self.data[px]); // B
                     }
                 }
-                DynamicImage::ImageRgb8(
-                    RgbImage::from_raw(self.width, self.height, buf).unwrap(),
-                )
+                DynamicImage::ImageRgb8(RgbImage::from_raw(self.width, self.height, buf).unwrap())
             }
             BitmapFormat::Bgra => {
                 let mut buf = Vec::with_capacity(w * h * 4);
@@ -160,13 +154,11 @@ impl Bitmap {
                         let px = row_start + col * bpp;
                         buf.push(self.data[px + 2]); // R
                         buf.push(self.data[px + 1]); // G
-                        buf.push(self.data[px]);      // B
+                        buf.push(self.data[px]); // B
                         buf.push(self.data[px + 3]); // A
                     }
                 }
-                DynamicImage::ImageRgba8(
-                    RgbaImage::from_raw(self.width, self.height, buf).unwrap(),
-                )
+                DynamicImage::ImageRgba8(RgbaImage::from_raw(self.width, self.height, buf).unwrap())
             }
         }
     }
