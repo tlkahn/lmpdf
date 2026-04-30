@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::fmt;
 use std::os::raw::{c_int, c_ulong, c_void};
 
-use crate::{FPDF_DOCUMENT, FPDF_PAGE, PdfiumBindings};
+use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, PdfiumBindings};
 
 #[derive(Debug, Clone)]
 pub enum SysError {
@@ -128,6 +128,89 @@ impl<B: PdfiumBindings> SafeBindings<B> {
 
     pub fn get_page_height(&self, page: FPDF_PAGE) -> f32 {
         unsafe { self.raw.FPDF_GetPageHeightF(page) }
+    }
+
+    pub fn create_bitmap(
+        &self,
+        width: c_int,
+        height: c_int,
+        alpha: c_int,
+    ) -> Result<FPDF_BITMAP, SysError> {
+        let bitmap = unsafe { self.raw.FPDFBitmap_Create(width, height, alpha) };
+        if bitmap.is_null() {
+            Err(SysError::Unknown)
+        } else {
+            Ok(bitmap)
+        }
+    }
+
+    pub fn destroy_bitmap(&self, bitmap: FPDF_BITMAP) {
+        unsafe { self.raw.FPDFBitmap_Destroy(bitmap) }
+    }
+
+    pub fn bitmap_buffer(&self, bitmap: FPDF_BITMAP) -> *mut c_void {
+        unsafe { self.raw.FPDFBitmap_GetBuffer(bitmap) }
+    }
+
+    pub fn bitmap_width(&self, bitmap: FPDF_BITMAP) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetWidth(bitmap) }
+    }
+
+    pub fn bitmap_height(&self, bitmap: FPDF_BITMAP) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetHeight(bitmap) }
+    }
+
+    pub fn bitmap_stride(&self, bitmap: FPDF_BITMAP) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetStride(bitmap) }
+    }
+
+    pub fn bitmap_format(&self, bitmap: FPDF_BITMAP) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetFormat(bitmap) }
+    }
+
+    pub fn bitmap_fill_rect(
+        &self,
+        bitmap: FPDF_BITMAP,
+        left: c_int,
+        top: c_int,
+        width: c_int,
+        height: c_int,
+        color: FPDF_DWORD,
+    ) {
+        unsafe {
+            self.raw
+                .FPDFBitmap_FillRect(bitmap, left, top, width, height, color)
+        }
+    }
+
+    pub fn render_page_bitmap(
+        &self,
+        bitmap: FPDF_BITMAP,
+        page: FPDF_PAGE,
+        start_x: c_int,
+        start_y: c_int,
+        size_x: c_int,
+        size_y: c_int,
+        rotate: c_int,
+        flags: c_int,
+    ) {
+        unsafe {
+            self.raw.FPDF_RenderPageBitmap(
+                bitmap, page, start_x, start_y, size_x, size_y, rotate, flags,
+            )
+        }
+    }
+
+    pub fn bitmap_copy_buffer(&self, bitmap: FPDF_BITMAP) -> Result<Vec<u8>, SysError> {
+        let buf = self.bitmap_buffer(bitmap);
+        if buf.is_null() {
+            return Err(SysError::Unknown);
+        }
+        let stride = self.bitmap_stride(bitmap);
+        let height = self.bitmap_height(bitmap);
+        let len = (stride * height) as usize;
+        let slice = unsafe { std::slice::from_raw_parts(buf as *const u8, len) };
+        Ok(slice.to_vec())
     }
 }
 

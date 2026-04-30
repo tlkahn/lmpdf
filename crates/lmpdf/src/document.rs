@@ -5,7 +5,9 @@ use std::sync::Arc;
 use lmpdf_sys::{FPDF_DOCUMENT, FPDF_PAGE, PdfiumLibrary};
 use slotmap::SlotMap;
 
-use crate::error::{Error, HandleError, PageError};
+use crate::bitmap::Bitmap;
+use crate::error::{DocumentError, Error, HandleError, PageError, RenderError};
+use crate::render::{RenderConfig, compute_target_dimensions};
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -120,6 +122,56 @@ impl Document {
     pub fn page_height(&self, r: PageRef) -> Result<f32, Error> {
         let data = self.resolve_page(r)?;
         Ok(data.height)
+    }
+
+    pub fn open(
+        lib: Arc<PdfiumLibrary>,
+        path: impl AsRef<std::path::Path>,
+        password: Option<&str>,
+    ) -> Result<Self, Error> {
+        let data = std::fs::read(path.as_ref())
+            .map_err(|e| Error::Document(DocumentError::IoError(e.to_string())))?;
+        Self::from_bytes(lib, &data, password)
+    }
+
+    pub fn render_page(&self, page_ref: PageRef, config: &RenderConfig) -> Result<Bitmap, Error> {
+        let page_data = self.resolve_page(page_ref)?;
+        let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
+
+        let bindings = self.lib.bindings();
+        let alpha = if config.format.has_alpha() { 1 } else { 0 };
+        let bitmap = bindings
+            .create_bitmap(w as i32, h as i32, alpha)
+            .map_err(|_| RenderError::BitmapCreationFailed)?;
+
+        bindings.bitmap_fill_rect(
+            bitmap,
+            0,
+            0,
+            w as i32,
+            h as i32,
+            config.background_color,
+        );
+
+        bindings.render_page_bitmap(
+            bitmap,
+            page_data.handle,
+            0,
+            0,
+            w as i32,
+            h as i32,
+            config.rotation.to_raw(),
+            config.flags.bits(),
+        );
+
+        let stride = bindings.bitmap_stride(bitmap) as u32;
+        let data = bindings
+            .bitmap_copy_buffer(bitmap)
+            .map_err(|_| RenderError::BufferCopyFailed)?;
+
+        bindings.destroy_bitmap(bitmap);
+
+        Ok(Bitmap::new(data, w, h, stride, config.format))
     }
 
     fn resolve_page(&self, r: PageRef) -> Result<PageData, Error> {

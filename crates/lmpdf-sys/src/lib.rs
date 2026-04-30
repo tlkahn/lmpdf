@@ -2,6 +2,14 @@
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
+use std::os::raw::c_int;
+
+pub const FPDFBitmap_Unknown: c_int = 0;
+pub const FPDFBitmap_Gray: c_int = 1;
+pub const FPDFBitmap_BGR: c_int = 2;
+pub const FPDFBitmap_BGRx: c_int = 3;
+pub const FPDFBitmap_BGRA: c_int = 4;
+
 mod ffi;
 pub use ffi::*;
 
@@ -70,6 +78,15 @@ mod tests {
 
         let p = FS_POINTF { x: 72.0, y: 72.0 };
         assert_eq!(p.x, 72.0);
+    }
+
+    #[test]
+    fn bitmap_format_constants_exist() {
+        assert_eq!(FPDFBitmap_Unknown, 0);
+        assert_eq!(FPDFBitmap_Gray, 1);
+        assert_eq!(FPDFBitmap_BGR, 2);
+        assert_eq!(FPDFBitmap_BGRx, 3);
+        assert_eq!(FPDFBitmap_BGRA, 4);
     }
 
     #[test]

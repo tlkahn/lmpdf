@@ -8,6 +8,7 @@ pub enum Error {
     Document(DocumentError),
     Page(PageError),
     Handle(HandleError),
+    Render(RenderError),
 }
 
 #[derive(Debug)]
@@ -22,6 +23,14 @@ pub enum DocumentError {
     InvalidFormat,
     IncorrectPassword,
     SecurityRestriction,
+    IoError(String),
+}
+
+#[derive(Debug)]
+pub enum RenderError {
+    BitmapCreationFailed,
+    InvalidDimensions { width: u32, height: u32 },
+    BufferCopyFailed,
 }
 
 #[derive(Debug)]
@@ -43,6 +52,7 @@ impl fmt::Display for Error {
             Error::Document(e) => write!(f, "document error: {e}"),
             Error::Page(e) => write!(f, "page error: {e}"),
             Error::Handle(e) => write!(f, "handle error: {e}"),
+            Error::Render(e) => write!(f, "render error: {e}"),
         }
     }
 }
@@ -63,6 +73,19 @@ impl fmt::Display for DocumentError {
             DocumentError::InvalidFormat => write!(f, "invalid PDF format"),
             DocumentError::IncorrectPassword => write!(f, "incorrect password"),
             DocumentError::SecurityRestriction => write!(f, "unsupported security restriction"),
+            DocumentError::IoError(s) => write!(f, "I/O error: {s}"),
+        }
+    }
+}
+
+impl fmt::Display for RenderError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RenderError::BitmapCreationFailed => write!(f, "bitmap creation failed"),
+            RenderError::InvalidDimensions { width, height } => {
+                write!(f, "invalid dimensions: {width}x{height}")
+            }
+            RenderError::BufferCopyFailed => write!(f, "buffer copy failed"),
         }
     }
 }
@@ -92,6 +115,7 @@ impl std::error::Error for LibraryError {}
 impl std::error::Error for DocumentError {}
 impl std::error::Error for PageError {}
 impl std::error::Error for HandleError {}
+impl std::error::Error for RenderError {}
 
 impl From<LibraryError> for Error {
     fn from(e: LibraryError) -> Self {
@@ -114,6 +138,12 @@ impl From<PageError> for Error {
 impl From<HandleError> for Error {
     fn from(e: HandleError) -> Self {
         Error::Handle(e)
+    }
+}
+
+impl From<RenderError> for Error {
+    fn from(e: RenderError) -> Self {
+        Error::Render(e)
     }
 }
 
@@ -175,6 +205,39 @@ mod tests {
     }
 
     #[test]
+    fn error_from_render_error() {
+        let e: Error = RenderError::BitmapCreationFailed.into();
+        assert!(matches!(
+            e,
+            Error::Render(RenderError::BitmapCreationFailed)
+        ));
+    }
+
+    #[test]
+    fn render_error_display() {
+        assert!(!RenderError::BitmapCreationFailed.to_string().is_empty());
+        assert!(!RenderError::InvalidDimensions {
+            width: 0,
+            height: 0
+        }
+        .to_string()
+        .is_empty());
+        assert!(!RenderError::BufferCopyFailed.to_string().is_empty());
+    }
+
+    #[test]
+    fn render_error_implements_std_error() {
+        fn assert_error<E: std::error::Error>() {}
+        assert_error::<RenderError>();
+    }
+
+    #[test]
+    fn document_error_io_error() {
+        let e = DocumentError::IoError("file not found".into());
+        assert!(e.to_string().contains("file not found"));
+    }
+
+    #[test]
     fn error_display_all_variants() {
         let cases: Vec<Error> = vec![
             LibraryError::LoadFailed("test".into()).into(),
@@ -183,6 +246,7 @@ mod tests {
             DocumentError::InvalidFormat.into(),
             DocumentError::IncorrectPassword.into(),
             DocumentError::SecurityRestriction.into(),
+            DocumentError::IoError("test".into()).into(),
             PageError::IndexOutOfBounds {
                 index: 5,
                 count: 3,
@@ -191,6 +255,13 @@ mod tests {
             PageError::LoadFailed.into(),
             HandleError::CrossDocument.into(),
             HandleError::Stale.into(),
+            RenderError::BitmapCreationFailed.into(),
+            RenderError::InvalidDimensions {
+                width: 0,
+                height: 0,
+            }
+            .into(),
+            RenderError::BufferCopyFailed.into(),
         ];
         for e in cases {
             assert!(!e.to_string().is_empty());

@@ -22,4 +22,12 @@ impl Pdfium {
     pub fn load_document(&self, data: &[u8], password: Option<&str>) -> Result<Document, Error> {
         Document::from_bytes(self.lib.clone(), data, password)
     }
+
+    pub fn open_document(
+        &self,
+        path: impl AsRef<Path>,
+        password: Option<&str>,
+    ) -> Result<Document, Error> {
+        Document::open(self.lib.clone(), path, password)
+    }
 }

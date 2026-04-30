@@ -1,12 +1,16 @@
 pub use lmpdf_sys;
 
-pub mod error;
+pub mod bitmap;
 pub mod document;
+pub mod error;
 pub mod pdfium;
+pub mod render;
 
+pub use bitmap::{Bitmap, BitmapFormat};
 pub use document::{Document, DocumentId, PageKey, PageRef};
 pub use error::Error;
 pub use pdfium::Pdfium;
+pub use render::{RenderConfig, RenderFlags, Rotation};
 
 #[cfg(test)]
 mod tests {
