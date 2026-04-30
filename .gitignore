@@ -3,3 +3,7 @@
 *.swo
 *~
 .DS_Store
+
+
+doc
+.claude
