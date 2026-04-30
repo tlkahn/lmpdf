@@ -4,6 +4,45 @@ use std::os::raw::{c_int, c_ulong, c_void};
 
 use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, PdfiumBindings};
 
+#[derive(Debug, Clone, Copy)]
+pub struct DocHandle(FPDF_DOCUMENT);
+impl DocHandle {
+    /// # Safety
+    /// `ptr` must be a valid, non-null `FPDF_DOCUMENT` returned by Pdfium.
+    pub unsafe fn from_raw(ptr: FPDF_DOCUMENT) -> Self {
+        Self(ptr)
+    }
+    pub fn as_raw(self) -> FPDF_DOCUMENT {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PageHandle(FPDF_PAGE);
+impl PageHandle {
+    /// # Safety
+    /// `ptr` must be a valid, non-null `FPDF_PAGE` returned by Pdfium.
+    pub unsafe fn from_raw(ptr: FPDF_PAGE) -> Self {
+        Self(ptr)
+    }
+    pub fn as_raw(self) -> FPDF_PAGE {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BitmapHandle(FPDF_BITMAP);
+impl BitmapHandle {
+    /// # Safety
+    /// `ptr` must be a valid, non-null `FPDF_BITMAP` returned by Pdfium.
+    pub unsafe fn from_raw(ptr: FPDF_BITMAP) -> Self {
+        Self(ptr)
+    }
+    pub fn as_raw(self) -> FPDF_BITMAP {
+        self.0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum SysError {
     Unknown,
@@ -78,7 +117,7 @@ impl<B: PdfiumBindings> SafeBindings<B> {
         &self,
         data: &[u8],
         password: Option<&str>,
-    ) -> Result<FPDF_DOCUMENT, SysError> {
+    ) -> Result<DocHandle, SysError> {
         let password_cstring = password
             .map(|p| CString::new(p).map_err(|e| SysError::NullInterior(e.to_string())))
             .transpose()?;
@@ -97,37 +136,37 @@ impl<B: PdfiumBindings> SafeBindings<B> {
         if doc.is_null() {
             Err(self.from_last_error())
         } else {
-            Ok(doc)
+            Ok(unsafe { DocHandle::from_raw(doc) })
         }
     }
 
-    pub fn close_document(&self, doc: FPDF_DOCUMENT) {
-        unsafe { self.raw.FPDF_CloseDocument(doc) }
+    pub fn close_document(&self, doc: DocHandle) {
+        unsafe { self.raw.FPDF_CloseDocument(doc.as_raw()) }
     }
 
-    pub fn get_page_count(&self, doc: FPDF_DOCUMENT) -> c_int {
-        unsafe { self.raw.FPDF_GetPageCount(doc) }
+    pub fn get_page_count(&self, doc: DocHandle) -> c_int {
+        unsafe { self.raw.FPDF_GetPageCount(doc.as_raw()) }
     }
 
-    pub fn load_page(&self, doc: FPDF_DOCUMENT, index: c_int) -> Result<FPDF_PAGE, SysError> {
-        let page = unsafe { self.raw.FPDF_LoadPage(doc, index) };
+    pub fn load_page(&self, doc: DocHandle, index: c_int) -> Result<PageHandle, SysError> {
+        let page = unsafe { self.raw.FPDF_LoadPage(doc.as_raw(), index) };
         if page.is_null() {
             Err(self.from_last_error())
         } else {
-            Ok(page)
+            Ok(unsafe { PageHandle::from_raw(page) })
         }
     }
 
-    pub fn close_page(&self, page: FPDF_PAGE) {
-        unsafe { self.raw.FPDF_ClosePage(page) }
+    pub fn close_page(&self, page: PageHandle) {
+        unsafe { self.raw.FPDF_ClosePage(page.as_raw()) }
     }
 
-    pub fn get_page_width(&self, page: FPDF_PAGE) -> f32 {
-        unsafe { self.raw.FPDF_GetPageWidthF(page) }
+    pub fn get_page_width(&self, page: PageHandle) -> f32 {
+        unsafe { self.raw.FPDF_GetPageWidthF(page.as_raw()) }
     }
 
-    pub fn get_page_height(&self, page: FPDF_PAGE) -> f32 {
-        unsafe { self.raw.FPDF_GetPageHeightF(page) }
+    pub fn get_page_height(&self, page: PageHandle) -> f32 {
+        unsafe { self.raw.FPDF_GetPageHeightF(page.as_raw()) }
     }
 
     pub fn create_bitmap(
@@ -135,42 +174,42 @@ impl<B: PdfiumBindings> SafeBindings<B> {
         width: c_int,
         height: c_int,
         alpha: c_int,
-    ) -> Result<FPDF_BITMAP, SysError> {
+    ) -> Result<BitmapHandle, SysError> {
         let bitmap = unsafe { self.raw.FPDFBitmap_Create(width, height, alpha) };
         if bitmap.is_null() {
             Err(SysError::Unknown)
         } else {
-            Ok(bitmap)
+            Ok(unsafe { BitmapHandle::from_raw(bitmap) })
         }
     }
 
-    pub fn destroy_bitmap(&self, bitmap: FPDF_BITMAP) {
-        unsafe { self.raw.FPDFBitmap_Destroy(bitmap) }
+    pub fn destroy_bitmap(&self, bitmap: BitmapHandle) {
+        unsafe { self.raw.FPDFBitmap_Destroy(bitmap.as_raw()) }
     }
 
-    pub fn bitmap_buffer(&self, bitmap: FPDF_BITMAP) -> *mut c_void {
-        unsafe { self.raw.FPDFBitmap_GetBuffer(bitmap) }
+    pub fn bitmap_buffer(&self, bitmap: BitmapHandle) -> *mut c_void {
+        unsafe { self.raw.FPDFBitmap_GetBuffer(bitmap.as_raw()) }
     }
 
-    pub fn bitmap_width(&self, bitmap: FPDF_BITMAP) -> c_int {
-        unsafe { self.raw.FPDFBitmap_GetWidth(bitmap) }
+    pub fn bitmap_width(&self, bitmap: BitmapHandle) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetWidth(bitmap.as_raw()) }
     }
 
-    pub fn bitmap_height(&self, bitmap: FPDF_BITMAP) -> c_int {
-        unsafe { self.raw.FPDFBitmap_GetHeight(bitmap) }
+    pub fn bitmap_height(&self, bitmap: BitmapHandle) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetHeight(bitmap.as_raw()) }
     }
 
-    pub fn bitmap_stride(&self, bitmap: FPDF_BITMAP) -> c_int {
-        unsafe { self.raw.FPDFBitmap_GetStride(bitmap) }
+    pub fn bitmap_stride(&self, bitmap: BitmapHandle) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetStride(bitmap.as_raw()) }
     }
 
-    pub fn bitmap_format(&self, bitmap: FPDF_BITMAP) -> c_int {
-        unsafe { self.raw.FPDFBitmap_GetFormat(bitmap) }
+    pub fn bitmap_format(&self, bitmap: BitmapHandle) -> c_int {
+        unsafe { self.raw.FPDFBitmap_GetFormat(bitmap.as_raw()) }
     }
 
     pub fn bitmap_fill_rect(
         &self,
-        bitmap: FPDF_BITMAP,
+        bitmap: BitmapHandle,
         left: c_int,
         top: c_int,
         width: c_int,
@@ -179,14 +218,15 @@ impl<B: PdfiumBindings> SafeBindings<B> {
     ) {
         unsafe {
             self.raw
-                .FPDFBitmap_FillRect(bitmap, left, top, width, height, color)
+                .FPDFBitmap_FillRect(bitmap.as_raw(), left, top, width, height, color)
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_page_bitmap(
         &self,
-        bitmap: FPDF_BITMAP,
-        page: FPDF_PAGE,
+        bitmap: BitmapHandle,
+        page: PageHandle,
         start_x: c_int,
         start_y: c_int,
         size_x: c_int,
@@ -196,12 +236,19 @@ impl<B: PdfiumBindings> SafeBindings<B> {
     ) {
         unsafe {
             self.raw.FPDF_RenderPageBitmap(
-                bitmap, page, start_x, start_y, size_x, size_y, rotate, flags,
+                bitmap.as_raw(),
+                page.as_raw(),
+                start_x,
+                start_y,
+                size_x,
+                size_y,
+                rotate,
+                flags,
             )
         }
     }
 
-    pub fn bitmap_copy_buffer(&self, bitmap: FPDF_BITMAP) -> Result<Vec<u8>, SysError> {
+    pub fn bitmap_copy_buffer(&self, bitmap: BitmapHandle) -> Result<Vec<u8>, SysError> {
         let buf = self.bitmap_buffer(bitmap);
         if buf.is_null() {
             return Err(SysError::Unknown);
@@ -274,5 +321,44 @@ mod tests {
     fn safe_bindings_signature_check() {
         fn accepts<B: PdfiumBindings>(_: &SafeBindings<B>) {}
         let _ = accepts::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn doc_handle_is_copy_clone_debug() {
+        fn assert_traits<T: Copy + Clone + std::fmt::Debug>() {}
+        assert_traits::<DocHandle>();
+    }
+
+    #[test]
+    fn page_handle_is_copy_clone_debug() {
+        fn assert_traits<T: Copy + Clone + std::fmt::Debug>() {}
+        assert_traits::<PageHandle>();
+    }
+
+    #[test]
+    fn bitmap_handle_is_copy_clone_debug() {
+        fn assert_traits<T: Copy + Clone + std::fmt::Debug>() {}
+        assert_traits::<BitmapHandle>();
+    }
+
+    #[test]
+    fn doc_handle_roundtrips_raw_pointer() {
+        let ptr: FPDF_DOCUMENT = std::ptr::null_mut();
+        let handle = unsafe { DocHandle::from_raw(ptr) };
+        assert_eq!(handle.as_raw(), ptr);
+    }
+
+    #[test]
+    fn page_handle_roundtrips_raw_pointer() {
+        let ptr: FPDF_PAGE = std::ptr::null_mut();
+        let handle = unsafe { PageHandle::from_raw(ptr) };
+        assert_eq!(handle.as_raw(), ptr);
+    }
+
+    #[test]
+    fn bitmap_handle_roundtrips_raw_pointer() {
+        let ptr: FPDF_BITMAP = std::ptr::null_mut();
+        let handle = unsafe { BitmapHandle::from_raw(ptr) };
+        assert_eq!(handle.as_raw(), ptr);
     }
 }

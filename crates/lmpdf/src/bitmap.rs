@@ -3,11 +3,12 @@ use std::os::raw::c_int;
 
 use lmpdf_sys::{FPDFBitmap_BGR, FPDFBitmap_BGRA, FPDFBitmap_BGRx, FPDFBitmap_Gray};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BitmapFormat {
     Gray,
     Bgr,
     BgrX,
+    #[default]
     Bgra,
 }
 
@@ -41,12 +42,6 @@ impl BitmapFormat {
 
     pub fn has_alpha(self) -> bool {
         matches!(self, BitmapFormat::Bgra)
-    }
-}
-
-impl Default for BitmapFormat {
-    fn default() -> Self {
-        BitmapFormat::Bgra
     }
 }
 

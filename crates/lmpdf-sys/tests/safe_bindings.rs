@@ -15,7 +15,6 @@ fn safe_load_mem_document_succeeds() {
     let sb = make_bindings();
     let pdf = include_bytes!("fixtures/hello.pdf");
     let doc = sb.load_mem_document(pdf, None).unwrap();
-    assert!(!doc.is_null());
     sb.close_document(doc);
     sb.destroy_library();
 }
@@ -48,7 +47,6 @@ fn safe_load_page_succeeds() {
     let pdf = include_bytes!("fixtures/hello.pdf");
     let doc = sb.load_mem_document(pdf, None).unwrap();
     let page = sb.load_page(doc, 0).unwrap();
-    assert!(!page.is_null());
     sb.close_page(page);
     sb.close_document(doc);
     sb.destroy_library();
@@ -87,7 +85,6 @@ fn safe_load_page_out_of_bounds_returns_error() {
 fn safe_create_bitmap_succeeds() {
     let sb = make_bindings();
     let bitmap = sb.create_bitmap(100, 100, 1).unwrap();
-    assert!(!bitmap.is_null());
     let w = sb.bitmap_width(bitmap);
     let h = sb.bitmap_height(bitmap);
     assert_eq!(w, 100);

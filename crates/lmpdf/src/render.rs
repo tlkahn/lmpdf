@@ -28,8 +28,9 @@ impl Default for RenderFlags {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Rotation {
+    #[default]
     None,
     Degrees90,
     Degrees180,
@@ -51,11 +52,6 @@ impl Rotation {
     }
 }
 
-impl Default for Rotation {
-    fn default() -> Self {
-        Rotation::None
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct RenderConfig {
@@ -181,20 +177,20 @@ pub fn compute_target_dimensions(
         (None, None) => {}
     }
 
-    if let Some(max_w) = config.max_width {
-        if w > max_w as f32 {
-            let ratio = max_w as f32 / w;
-            w = max_w as f32;
-            h *= ratio;
-        }
+    if let Some(max_w) = config.max_width
+        && w > max_w as f32
+    {
+        let ratio = max_w as f32 / w;
+        w = max_w as f32;
+        h *= ratio;
     }
 
-    if let Some(max_h) = config.max_height {
-        if h > max_h as f32 {
-            let ratio = max_h as f32 / h;
-            h = max_h as f32;
-            w *= ratio;
-        }
+    if let Some(max_h) = config.max_height
+        && h > max_h as f32
+    {
+        let ratio = max_h as f32 / h;
+        h = max_h as f32;
+        w *= ratio;
     }
 
     let fw = (w.round() as u32).max(1);

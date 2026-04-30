@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use lmpdf_sys::{FPDF_DOCUMENT, FPDF_PAGE, PdfiumLibrary};
+use lmpdf_sys::{DocHandle, PageHandle, PdfiumLibrary};
 use slotmap::SlotMap;
 
 use crate::bitmap::Bitmap;
@@ -32,14 +32,14 @@ pub struct PageRef {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PageData {
-    pub handle: FPDF_PAGE,
+    pub handle: PageHandle,
     pub width: f32,
     pub height: f32,
 }
 
 pub struct Document {
     id: DocumentId,
-    handle: FPDF_DOCUMENT,
+    handle: DocHandle,
     lib: Arc<PdfiumLibrary>,
     page_count: i32,
     pages: RefCell<SlotMap<PageKey, PageData>>,
@@ -238,7 +238,7 @@ mod tests {
         let doc_id = DocumentId::next();
         let mut sm = SlotMap::<PageKey, PageData>::with_key();
         let key = sm.insert(PageData {
-            handle: std::ptr::null_mut(),
+            handle: unsafe { PageHandle::from_raw(std::ptr::null_mut()) },
             width: 100.0,
             height: 200.0,
         });
@@ -253,7 +253,7 @@ mod tests {
         let other_id = DocumentId::next();
         let mut pages = SlotMap::<PageKey, PageData>::with_key();
         let key = pages.insert(PageData {
-            handle: std::ptr::null_mut(),
+            handle: unsafe { PageHandle::from_raw(std::ptr::null_mut()) },
             width: 0.0,
             height: 0.0,
         });
@@ -273,7 +273,7 @@ mod tests {
         let doc_id = DocumentId::next();
         let mut pages = SlotMap::<PageKey, PageData>::with_key();
         let key = pages.insert(PageData {
-            handle: std::ptr::null_mut(),
+            handle: unsafe { PageHandle::from_raw(std::ptr::null_mut()) },
             width: 0.0,
             height: 0.0,
         });
@@ -288,7 +288,7 @@ mod tests {
         let doc_id = DocumentId::next();
         let mut pages = SlotMap::<PageKey, PageData>::with_key();
         let key = pages.insert(PageData {
-            handle: std::ptr::null_mut(),
+            handle: unsafe { PageHandle::from_raw(std::ptr::null_mut()) },
             width: 612.0,
             height: 792.0,
         });
