@@ -12,6 +12,10 @@ bitflags = "2"
 version = "0.25"
 optional = true
 
+[[example]]
+name = "render"
+required-features = ["image"]
+
 [features]
 default = ["pdfium_latest"]
 pdfium_latest = ["lmpdf-sys/pdfium_latest"]
