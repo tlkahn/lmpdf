@@ -112,6 +112,8 @@ impl fmt::Display for HandleError {
     }
 }
 
+pub type Result<T> = std::result::Result<T, Error>;
+
 impl std::error::Error for Error {}
 impl std::error::Error for LibraryError {}
 impl std::error::Error for DocumentError {}

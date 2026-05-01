@@ -8,6 +8,7 @@ use slotmap::SlotMap;
 use crate::bitmap::Bitmap;
 use crate::error::{DocumentError, Error, HandleError, PageError, RenderError};
 use crate::render::{RenderConfig, compute_target_dimensions};
+use crate::Result;
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -54,7 +55,7 @@ impl Document {
         lib: Arc<PdfiumLibrary>,
         data: &[u8],
         password: Option<&str>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let owned = data.to_vec();
         let bindings = lib.bindings();
         let handle = bindings
@@ -81,7 +82,7 @@ impl Document {
         self.page_count
     }
 
-    pub fn page(&self, index: i32) -> Result<PageRef, Error> {
+    pub fn page(&self, index: i32) -> Result<PageRef> {
         if index < 0 || index >= self.page_count {
             return Err(PageError::IndexOutOfBounds {
                 index,
@@ -119,12 +120,12 @@ impl Document {
         })
     }
 
-    pub fn page_width(&self, r: PageRef) -> Result<f32, Error> {
+    pub fn page_width(&self, r: PageRef) -> Result<f32> {
         let data = self.resolve_page(r)?;
         Ok(data.width)
     }
 
-    pub fn page_height(&self, r: PageRef) -> Result<f32, Error> {
+    pub fn page_height(&self, r: PageRef) -> Result<f32> {
         let data = self.resolve_page(r)?;
         Ok(data.height)
     }
@@ -133,13 +134,13 @@ impl Document {
         lib: Arc<PdfiumLibrary>,
         path: impl AsRef<std::path::Path>,
         password: Option<&str>,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self> {
         let data = std::fs::read(path.as_ref())
             .map_err(|e| Error::Document(DocumentError::IoError(e.to_string())))?;
         Self::from_bytes(lib, &data, password)
     }
 
-    pub fn render_page(&self, page_ref: PageRef, config: &RenderConfig) -> Result<Bitmap, Error> {
+    pub fn render_page(&self, page_ref: PageRef, config: &RenderConfig) -> Result<Bitmap> {
         let page_data = self.resolve_page(page_ref)?;
         let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
 
@@ -178,7 +179,7 @@ impl Document {
         config: &RenderConfig,
         device_x: i32,
         device_y: i32,
-    ) -> Result<(f64, f64), Error> {
+    ) -> Result<(f64, f64)> {
         let page_data = self.resolve_page(page_ref)?;
         let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
         let bindings = self.lib.bindings();
@@ -202,7 +203,7 @@ impl Document {
         config: &RenderConfig,
         page_x: f64,
         page_y: f64,
-    ) -> Result<(i32, i32), Error> {
+    ) -> Result<(i32, i32)> {
         let page_data = self.resolve_page(page_ref)?;
         let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
         let bindings = self.lib.bindings();
@@ -220,7 +221,7 @@ impl Document {
             .map_err(|_| Error::Render(RenderError::ConversionFailed))
     }
 
-    fn resolve_page(&self, r: PageRef) -> Result<PageData, Error> {
+    fn resolve_page(&self, r: PageRef) -> Result<PageData> {
         resolve_page_inner(self.id, &self.pages.borrow(), r)
     }
 }
@@ -229,7 +230,7 @@ fn resolve_page_inner(
     doc_id: DocumentId,
     pages: &SlotMap<PageKey, PageData>,
     r: PageRef,
-) -> Result<PageData, Error> {
+) -> Result<PageData> {
     if r.doc_id != doc_id {
         return Err(HandleError::CrossDocument.into());
     }
@@ -351,7 +352,7 @@ mod tests {
             doc: &Document,
             page_ref: PageRef,
             config: &crate::render::RenderConfig,
-        ) -> Result<(f64, f64), Error> {
+        ) -> Result<(f64, f64)> {
             doc.device_to_page(page_ref, config, 0, 0)
         }
         let _ = assert_method;
@@ -363,7 +364,7 @@ mod tests {
             doc: &Document,
             page_ref: PageRef,
             config: &crate::render::RenderConfig,
-        ) -> Result<(i32, i32), Error> {
+        ) -> Result<(i32, i32)> {
             doc.page_to_device(page_ref, config, 0.0, 0.0)
         }
         let _ = assert_method;

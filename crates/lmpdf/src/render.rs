@@ -1,7 +1,8 @@
 use bitflags::bitflags;
 
 use crate::bitmap::BitmapFormat;
-use crate::error::{Error, RenderError};
+use crate::error::RenderError;
+use crate::Result;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -145,7 +146,7 @@ pub fn compute_target_dimensions(
     page_w: f32,
     page_h: f32,
     config: &RenderConfig,
-) -> Result<(u32, u32), Error> {
+) -> Result<(u32, u32)> {
     if page_w <= 0.0 || page_h <= 0.0 {
         return Err(RenderError::InvalidDimensions {
             width: 0,
