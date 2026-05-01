@@ -3,7 +3,8 @@
 *.swo
 *~
 .DS_Store
-
+.playwright-cli
+.github
 
 doc
 .claude
