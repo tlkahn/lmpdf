@@ -42,7 +42,7 @@ pub struct Document {
     id: DocumentId,
     handle: DocHandle,
     lib: Arc<PdfiumLibrary>,
-    page_count: i32,
+    page_count: usize,
     pages: RefCell<SlotMap<PageKey, PageData>>,
     page_index_map: RefCell<Vec<Option<PageKey>>>,
     // PDFium's FPDF_LoadMemDocument64 does not copy the buffer — it references
@@ -61,7 +61,7 @@ impl Document {
         let handle = bindings
             .load_mem_document(&owned, password)
             .map_err(|e| Error::Document(crate::error::DocumentError::from(e)))?;
-        let page_count = bindings.get_page_count(handle).max(0);
+        let page_count = bindings.get_page_count(handle).max(0) as usize;
 
         Ok(Self {
             id: DocumentId::next(),
@@ -69,7 +69,7 @@ impl Document {
             lib,
             page_count,
             pages: RefCell::new(SlotMap::with_key()),
-            page_index_map: RefCell::new(vec![None; page_count as usize]),
+            page_index_map: RefCell::new(vec![None; page_count]),
             _backing: owned,
         })
     }
@@ -78,12 +78,12 @@ impl Document {
         self.id
     }
 
-    pub fn page_count(&self) -> i32 {
+    pub fn page_count(&self) -> usize {
         self.page_count
     }
 
-    pub fn page(&self, index: i32) -> Result<PageRef> {
-        if index < 0 || index >= self.page_count {
+    pub fn page(&self, index: usize) -> Result<PageRef> {
+        if index >= self.page_count {
             return Err(PageError::IndexOutOfBounds {
                 index,
                 count: self.page_count,
@@ -91,8 +91,7 @@ impl Document {
             .into());
         }
 
-        let idx = index as usize;
-        if let Some(key) = self.page_index_map.borrow()[idx] {
+        if let Some(key) = self.page_index_map.borrow()[index] {
             return Ok(PageRef {
                 doc_id: self.id,
                 key,
@@ -101,7 +100,7 @@ impl Document {
 
         let bindings = self.lib.bindings();
         let page_handle = bindings
-            .load_page(self.handle, index)
+            .load_page(self.handle, index as std::os::raw::c_int)
             .map_err(|_| PageError::LoadFailed)?;
         let width = bindings.get_page_width(page_handle);
         let height = bindings.get_page_height(page_handle);
@@ -112,7 +111,7 @@ impl Document {
             height,
         };
         let key = self.pages.borrow_mut().insert(data);
-        self.page_index_map.borrow_mut()[idx] = Some(key);
+        self.page_index_map.borrow_mut()[index] = Some(key);
 
         Ok(PageRef {
             doc_id: self.id,
@@ -344,6 +343,22 @@ mod tests {
         let data = result.unwrap();
         assert_eq!(data.width, 612.0);
         assert_eq!(data.height, 792.0);
+    }
+
+    #[test]
+    fn page_count_returns_usize() {
+        fn assert_return_type(doc: &Document) {
+            let _: usize = doc.page_count();
+        }
+        let _ = assert_return_type;
+    }
+
+    #[test]
+    fn page_accepts_usize() {
+        fn assert_param_type(doc: &Document) -> Result<PageRef> {
+            doc.page(0_usize)
+        }
+        let _ = assert_param_type;
     }
 
     #[test]

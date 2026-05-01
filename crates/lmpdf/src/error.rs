@@ -36,7 +36,7 @@ pub enum RenderError {
 
 #[derive(Debug)]
 pub enum PageError {
-    IndexOutOfBounds { index: i32, count: i32 },
+    IndexOutOfBounds { index: usize, count: usize },
     LoadFailed,
 }
 
@@ -193,6 +193,15 @@ mod tests {
     fn error_from_page_error() {
         let e: Error = PageError::IndexOutOfBounds { index: 0, count: 1 }.into();
         assert!(matches!(e, Error::Page(PageError::IndexOutOfBounds { .. })));
+    }
+
+    #[test]
+    fn page_error_index_out_of_bounds_uses_usize() {
+        let err = PageError::IndexOutOfBounds { index: 5, count: 3 };
+        if let PageError::IndexOutOfBounds { index, count } = err {
+            let _: usize = index;
+            let _: usize = count;
+        }
     }
 
     #[test]
