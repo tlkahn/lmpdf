@@ -172,6 +172,54 @@ impl Document {
         Ok(Bitmap::new(data, w, h, stride, config.format))
     }
 
+    pub fn device_to_page(
+        &self,
+        page_ref: PageRef,
+        config: &RenderConfig,
+        device_x: i32,
+        device_y: i32,
+    ) -> Result<(f64, f64), Error> {
+        let page_data = self.resolve_page(page_ref)?;
+        let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
+        let bindings = self.lib.bindings();
+        bindings
+            .device_to_page(
+                page_data.handle,
+                0,
+                0,
+                w as i32,
+                h as i32,
+                config.rotation.to_raw(),
+                device_x,
+                device_y,
+            )
+            .map_err(|_| Error::Render(RenderError::ConversionFailed))
+    }
+
+    pub fn page_to_device(
+        &self,
+        page_ref: PageRef,
+        config: &RenderConfig,
+        page_x: f64,
+        page_y: f64,
+    ) -> Result<(i32, i32), Error> {
+        let page_data = self.resolve_page(page_ref)?;
+        let (w, h) = compute_target_dimensions(page_data.width, page_data.height, config)?;
+        let bindings = self.lib.bindings();
+        bindings
+            .page_to_device(
+                page_data.handle,
+                0,
+                0,
+                w as i32,
+                h as i32,
+                config.rotation.to_raw(),
+                page_x,
+                page_y,
+            )
+            .map_err(|_| Error::Render(RenderError::ConversionFailed))
+    }
+
     fn resolve_page(&self, r: PageRef) -> Result<PageData, Error> {
         resolve_page_inner(self.id, &self.pages.borrow(), r)
     }
@@ -295,5 +343,29 @@ mod tests {
         let data = result.unwrap();
         assert_eq!(data.width, 612.0);
         assert_eq!(data.height, 792.0);
+    }
+
+    #[test]
+    fn device_to_page_signature_exists() {
+        fn assert_method(
+            doc: &Document,
+            page_ref: PageRef,
+            config: &crate::render::RenderConfig,
+        ) -> Result<(f64, f64), Error> {
+            doc.device_to_page(page_ref, config, 0, 0)
+        }
+        let _ = assert_method;
+    }
+
+    #[test]
+    fn page_to_device_signature_exists() {
+        fn assert_method(
+            doc: &Document,
+            page_ref: PageRef,
+            config: &crate::render::RenderConfig,
+        ) -> Result<(i32, i32), Error> {
+            doc.page_to_device(page_ref, config, 0.0, 0.0)
+        }
+        let _ = assert_method;
     }
 }

@@ -31,6 +31,7 @@ pub enum RenderError {
     BitmapCreationFailed,
     InvalidDimensions { width: u32, height: u32 },
     BufferCopyFailed,
+    ConversionFailed,
 }
 
 #[derive(Debug)]
@@ -86,6 +87,7 @@ impl fmt::Display for RenderError {
                 write!(f, "invalid dimensions: {width}x{height}")
             }
             RenderError::BufferCopyFailed => write!(f, "buffer copy failed"),
+            RenderError::ConversionFailed => write!(f, "coordinate conversion failed"),
         }
     }
 }
@@ -218,6 +220,7 @@ mod tests {
             .is_empty()
         );
         assert!(!RenderError::BufferCopyFailed.to_string().is_empty());
+        assert!(!RenderError::ConversionFailed.to_string().is_empty());
     }
 
     #[test]
@@ -253,6 +256,7 @@ mod tests {
             }
             .into(),
             RenderError::BufferCopyFailed.into(),
+            RenderError::ConversionFailed.into(),
         ];
         for e in cases {
             assert!(!e.to_string().is_empty());

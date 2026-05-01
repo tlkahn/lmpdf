@@ -1,6 +1,6 @@
 use std::ffi::CString;
 use std::fmt;
-use std::os::raw::{c_int, c_ulong, c_void};
+use std::os::raw::{c_double, c_int, c_ulong, c_void};
 
 use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, PdfiumBindings};
 
@@ -259,6 +259,76 @@ impl<B: PdfiumBindings> SafeBindings<B> {
         let slice = unsafe { std::slice::from_raw_parts(buf as *const u8, len) };
         Ok(slice.to_vec())
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn device_to_page(
+        &self,
+        page: PageHandle,
+        start_x: c_int,
+        start_y: c_int,
+        size_x: c_int,
+        size_y: c_int,
+        rotate: c_int,
+        device_x: c_int,
+        device_y: c_int,
+    ) -> Result<(c_double, c_double), SysError> {
+        let mut page_x: c_double = 0.0;
+        let mut page_y: c_double = 0.0;
+        let ok = unsafe {
+            self.raw.FPDF_DeviceToPage(
+                page.as_raw(),
+                start_x,
+                start_y,
+                size_x,
+                size_y,
+                rotate,
+                device_x,
+                device_y,
+                &mut page_x,
+                &mut page_y,
+            )
+        };
+        if ok == 0 {
+            Err(SysError::Unknown)
+        } else {
+            Ok((page_x, page_y))
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn page_to_device(
+        &self,
+        page: PageHandle,
+        start_x: c_int,
+        start_y: c_int,
+        size_x: c_int,
+        size_y: c_int,
+        rotate: c_int,
+        page_x: c_double,
+        page_y: c_double,
+    ) -> Result<(c_int, c_int), SysError> {
+        let mut device_x: c_int = 0;
+        let mut device_y: c_int = 0;
+        let ok = unsafe {
+            self.raw.FPDF_PageToDevice(
+                page.as_raw(),
+                start_x,
+                start_y,
+                size_x,
+                size_y,
+                rotate,
+                page_x,
+                page_y,
+                &mut device_x,
+                &mut device_y,
+            )
+        };
+        if ok == 0 {
+            Err(SysError::Unknown)
+        } else {
+            Ok((device_x, device_y))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -321,6 +391,28 @@ mod tests {
     fn safe_bindings_signature_check() {
         fn accepts<B: PdfiumBindings>(_: &SafeBindings<B>) {}
         let _ = accepts::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn device_to_page_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            page: PageHandle,
+        ) -> Result<(f64, f64), SysError> {
+            sb.device_to_page(page, 0, 0, 100, 100, 0, 50, 50)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn page_to_device_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            page: PageHandle,
+        ) -> Result<(c_int, c_int), SysError> {
+            sb.page_to_device(page, 0, 0, 100, 100, 0, 50.0, 50.0)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
     }
 
     #[test]

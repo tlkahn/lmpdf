@@ -274,6 +274,112 @@ fn open_document_invalid_file() {
     ));
 }
 
+// --- Coordinate conversion tests ---
+
+#[test]
+#[ignore]
+fn device_to_page_top_left() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(1.0);
+    let (px, py) = doc.device_to_page(r, &cfg, 0, 0).unwrap();
+    assert!((px - 0.0).abs() < 1.0);
+    assert!((py - 792.0).abs() < 1.0);
+}
+
+#[test]
+#[ignore]
+fn page_to_device_origin() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(1.0);
+    let (dx, dy) = doc.page_to_device(r, &cfg, 0.0, 792.0).unwrap();
+    assert!((dx as f64).abs() < 2.0);
+    assert!((dy as f64).abs() < 2.0);
+}
+
+#[test]
+#[ignore]
+fn round_trip_device_to_page_to_device() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(1.0);
+    for (dx, dy) in [(100, 200), (0, 0), (300, 400)] {
+        let (px, py) = doc.device_to_page(r, &cfg, dx, dy).unwrap();
+        let (dx2, dy2) = doc.page_to_device(r, &cfg, px, py).unwrap();
+        assert!((dx2 - dx).abs() <= 1);
+        assert!((dy2 - dy).abs() <= 1);
+    }
+}
+
+#[test]
+#[ignore]
+fn round_trip_page_to_device_to_page() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(1.0);
+    for (px, py) in [(100.0, 200.0), (0.0, 0.0), (306.0, 396.0)] {
+        let (dx, dy) = doc.page_to_device(r, &cfg, px, py).unwrap();
+        let (px2, py2) = doc.device_to_page(r, &cfg, dx, dy).unwrap();
+        assert!((px2 - px).abs() < 2.0);
+        assert!((py2 - py).abs() < 2.0);
+    }
+}
+
+#[test]
+#[ignore]
+fn coord_conversion_with_rotation() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(1.0).rotation(Rotation::Degrees90);
+    for (dx, dy) in [(100, 200), (50, 50)] {
+        let (px, py) = doc.device_to_page(r, &cfg, dx, dy).unwrap();
+        let (dx2, dy2) = doc.page_to_device(r, &cfg, px, py).unwrap();
+        assert!((dx2 - dx).abs() <= 1);
+        assert!((dy2 - dy).abs() <= 1);
+    }
+}
+
+#[test]
+#[ignore]
+fn coord_conversion_with_scale() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let r = doc.page(0).unwrap();
+    let cfg = RenderConfig::new().scale(3.0);
+    for (dx, dy) in [(150, 300), (0, 0)] {
+        let (px, py) = doc.device_to_page(r, &cfg, dx, dy).unwrap();
+        let (dx2, dy2) = doc.page_to_device(r, &cfg, px, py).unwrap();
+        assert!((dx2 - dx).abs() <= 1);
+        assert!((dy2 - dy).abs() <= 1);
+    }
+}
+
+#[test]
+#[ignore]
+fn coord_conversion_cross_document_error() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc1 = p.load_document(hello_pdf(), None).unwrap();
+    let doc2 = p.load_document(hello_pdf(), None).unwrap();
+    let r1 = doc1.page(0).unwrap();
+    let cfg = RenderConfig::default();
+    let result = doc2.device_to_page(r1, &cfg, 0, 0);
+    assert!(matches!(
+        result,
+        Err(Error::Handle(HandleError::CrossDocument))
+    ));
+    let result = doc2.page_to_device(r1, &cfg, 0.0, 0.0);
+    assert!(matches!(
+        result,
+        Err(Error::Handle(HandleError::CrossDocument))
+    ));
+}
+
 // --- Re-export compile checks ---
 
 #[test]
