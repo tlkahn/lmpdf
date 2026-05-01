@@ -44,6 +44,9 @@ pub struct Document {
     page_count: i32,
     pages: RefCell<SlotMap<PageKey, PageData>>,
     page_index_map: RefCell<Vec<Option<PageKey>>>,
+    // PDFium's FPDF_LoadMemDocument64 does not copy the buffer — it references
+    // it directly.  This Vec must outlive the DocHandle.
+    _backing: Vec<u8>,
 }
 
 impl Document {
@@ -52,9 +55,10 @@ impl Document {
         data: &[u8],
         password: Option<&str>,
     ) -> Result<Self, Error> {
+        let owned = data.to_vec();
         let bindings = lib.bindings();
         let handle = bindings
-            .load_mem_document(data, password)
+            .load_mem_document(&owned, password)
             .map_err(|e| Error::Document(crate::error::DocumentError::from(e)))?;
         let page_count = bindings.get_page_count(handle).max(0);
 
@@ -65,6 +69,7 @@ impl Document {
             page_count,
             pages: RefCell::new(SlotMap::with_key()),
             page_index_map: RefCell::new(vec![None; page_count as usize]),
+            _backing: owned,
         })
     }
 
