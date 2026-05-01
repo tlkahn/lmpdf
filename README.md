@@ -41,17 +41,18 @@ Render every page of a PDF to PNG (the default config renders at 144 DPI with hi
 use lmpdf::{Pdfium, RenderConfig};
 use std::path::PathBuf;
 
-fn main() {
-    let pdfium = Pdfium::open(std::env::var("PDFIUM_PATH").unwrap()).unwrap();
-    let doc = pdfium.open_document("input.pdf", None).unwrap();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let pdfium = Pdfium::open(std::env::var("PDFIUM_PATH")?)?;
+    let doc = pdfium.open_document("input.pdf", None)?;
     let config = RenderConfig::new(); // 144 DPI, PRINTING + LCD_TEXT + ANNOTATIONS
 
     for i in 0..doc.page_count() {
-        let page = doc.page(i).unwrap();
-        let bitmap = doc.render_page(page, &config).unwrap();
+        let page = doc.page(i)?;
+        let bitmap = doc.render_page(page, &config)?;
         let img = bitmap.to_image(); // requires `image` feature
-        img.save(PathBuf::from(format!("page_{}.png", i + 1))).unwrap();
+        img.save(PathBuf::from(format!("page_{}.png", i + 1)))?;
     }
+    Ok(())
 }
 ```
 
