@@ -1,8 +1,8 @@
 use bitflags::bitflags;
 
+use crate::Result;
 use crate::bitmap::BitmapFormat;
 use crate::error::RenderError;
-use crate::Result;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]

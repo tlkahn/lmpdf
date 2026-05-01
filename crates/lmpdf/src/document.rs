@@ -5,10 +5,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use lmpdf_sys::{DocHandle, PageHandle, PdfiumLibrary};
 use slotmap::SlotMap;
 
+use crate::Result;
 use crate::bitmap::Bitmap;
 use crate::error::{DocumentError, Error, HandleError, PageError, RenderError};
 use crate::render::{RenderConfig, compute_target_dimensions};
-use crate::Result;
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
 

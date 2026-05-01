@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use lmpdf_sys::PdfiumLibrary;
 
+use crate::Result;
 use crate::document::Document;
 use crate::error::{Error, LibraryError};
-use crate::Result;
 
 pub struct Pdfium {
     lib: Arc<PdfiumLibrary>,
