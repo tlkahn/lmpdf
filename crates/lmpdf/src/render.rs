@@ -24,7 +24,7 @@ bitflags! {
 
 impl Default for RenderFlags {
     fn default() -> Self {
-        RenderFlags::ANNOTATIONS
+        RenderFlags::ANNOTATIONS | RenderFlags::PRINTING | RenderFlags::LCD_TEXT
     }
 }
 
@@ -85,6 +85,10 @@ impl RenderConfig {
         self
     }
 
+    pub fn dpi(self, dpi: u32) -> Self {
+        self.scale(dpi as f32 / 72.0)
+    }
+
     pub fn max_width(mut self, w: u32) -> Self {
         self.max_width = Some(w);
         self
@@ -126,7 +130,7 @@ impl Default for RenderConfig {
         Self {
             width: None,
             height: None,
-            scale: None,
+            scale: Some(2.0),
             max_width: None,
             max_height: None,
             rotation: Rotation::None,
@@ -207,8 +211,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn render_flags_default_is_annotations() {
-        assert_eq!(RenderFlags::default(), RenderFlags::ANNOTATIONS);
+    fn render_flags_default_is_hq() {
+        assert_eq!(
+            RenderFlags::default(),
+            RenderFlags::ANNOTATIONS | RenderFlags::PRINTING | RenderFlags::LCD_TEXT
+        );
+    }
+
+    #[test]
+    fn render_flags_default_bits_value() {
+        assert_eq!(RenderFlags::default().bits(), 0x803);
     }
 
     #[test]
@@ -244,12 +256,15 @@ mod tests {
         let cfg = RenderConfig::default();
         assert_eq!(cfg.width, None);
         assert_eq!(cfg.height, None);
-        assert_eq!(cfg.scale, None);
+        assert_eq!(cfg.scale, Some(2.0));
         assert_eq!(cfg.max_width, None);
         assert_eq!(cfg.max_height, None);
         assert_eq!(cfg.rotation, Rotation::None);
         assert_eq!(cfg.background_color, 0xFFFFFFFF);
-        assert_eq!(cfg.flags, RenderFlags::ANNOTATIONS);
+        assert_eq!(
+            cfg.flags,
+            RenderFlags::ANNOTATIONS | RenderFlags::PRINTING | RenderFlags::LCD_TEXT
+        );
         assert_eq!(cfg.format, BitmapFormat::Bgra);
     }
 
@@ -284,11 +299,31 @@ mod tests {
     }
 
     #[test]
-    fn compute_default_uses_page_size() {
+    fn dpi_sets_correct_scale() {
+        let cfg = RenderConfig::new().dpi(300);
+        assert_eq!(cfg.scale, Some(300.0 / 72.0));
+    }
+
+    #[test]
+    fn dpi_72_equals_scale_1() {
+        let cfg = RenderConfig::new().dpi(72);
+        assert_eq!(cfg.scale, Some(1.0));
+    }
+
+    #[test]
+    fn compute_dpi_300() {
+        let cfg = RenderConfig::new().dpi(300);
+        let (w, h) = compute_target_dimensions(612.0, 792.0, &cfg).unwrap();
+        assert_eq!(w, 2550);
+        assert_eq!(h, 3300);
+    }
+
+    #[test]
+    fn compute_default_uses_144dpi() {
         let cfg = RenderConfig::default();
         let (w, h) = compute_target_dimensions(612.0, 792.0, &cfg).unwrap();
-        assert_eq!(w, 612);
-        assert_eq!(h, 792);
+        assert_eq!(w, 1224);
+        assert_eq!(h, 1584);
     }
 
     #[test]
@@ -343,16 +378,16 @@ mod tests {
     fn compute_rotation_swaps_dims() {
         let cfg = RenderConfig::new().rotation(Rotation::Degrees90);
         let (w, h) = compute_target_dimensions(612.0, 792.0, &cfg).unwrap();
-        assert_eq!(w, 792);
-        assert_eq!(h, 612);
+        assert_eq!(w, 1584);
+        assert_eq!(h, 1224);
     }
 
     #[test]
     fn compute_rotation_180_no_swap() {
         let cfg = RenderConfig::new().rotation(Rotation::Degrees180);
         let (w, h) = compute_target_dimensions(612.0, 792.0, &cfg).unwrap();
-        assert_eq!(w, 612);
-        assert_eq!(h, 792);
+        assert_eq!(w, 1224);
+        assert_eq!(h, 1584);
     }
 
     #[test]

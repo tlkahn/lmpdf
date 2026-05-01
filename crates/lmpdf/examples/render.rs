@@ -6,7 +6,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 3 {
         eprintln!("Usage: render <input.pdf> <output_prefix>");
-        eprintln!("  Renders each page to <output_prefix>_page<N>.jpg");
+        eprintln!("  Renders each page to <output_prefix>_page<N>.png");
         eprintln!("  Requires PDFIUM_PATH env var pointing to libpdfium");
         std::process::exit(1);
     }
@@ -30,7 +30,7 @@ fn main() {
             .expect("Failed to render page");
 
         let img = bitmap.to_image();
-        let path = PathBuf::from(format!("{output_prefix}_page{}.jpg", i + 1));
+        let path = PathBuf::from(format!("{output_prefix}_page{}.png", i + 1));
         img.save(&path).expect("Failed to save image");
         println!(
             "Saved {} ({}x{})",

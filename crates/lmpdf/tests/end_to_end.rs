@@ -146,8 +146,8 @@ fn render_page_default_config() {
     let doc = p.load_document(hello_pdf(), None).unwrap();
     let r = doc.page(0).unwrap();
     let bm = doc.render_page(r, &RenderConfig::default()).unwrap();
-    assert_eq!(bm.width(), 612);
-    assert_eq!(bm.height(), 792);
+    assert_eq!(bm.width(), 1224);
+    assert_eq!(bm.height(), 1584);
     assert_eq!(bm.format(), BitmapFormat::Bgra);
     assert!(!bm.data().is_empty());
 }
