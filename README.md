@@ -35,7 +35,7 @@ Add `lmpdf` to your `Cargo.toml`:
 lmpdf = { git = "https://github.com/tlkahn/lmpdf.git" }
 ```
 
-Render every page of a PDF to JPEG:
+Render every page of a PDF to PNG (the default config renders at 144 DPI with high-quality flags):
 
 ```rust
 use lmpdf::{Pdfium, RenderConfig};
@@ -44,13 +44,13 @@ use std::path::PathBuf;
 fn main() {
     let pdfium = Pdfium::open(std::env::var("PDFIUM_PATH").unwrap()).unwrap();
     let doc = pdfium.open_document("input.pdf", None).unwrap();
-    let config = RenderConfig::new().scale(2.0);
+    let config = RenderConfig::new(); // 144 DPI, PRINTING + LCD_TEXT + ANNOTATIONS
 
     for i in 0..doc.page_count() {
         let page = doc.page(i).unwrap();
         let bitmap = doc.render_page(page, &config).unwrap();
         let img = bitmap.to_image(); // requires `image` feature
-        img.save(PathBuf::from(format!("page_{}.jpg", i + 1))).unwrap();
+        img.save(PathBuf::from(format!("page_{}.png", i + 1))).unwrap();
     }
 }
 ```
@@ -64,7 +64,7 @@ use lmpdf::{RenderConfig, RenderFlags, Rotation};
 use lmpdf::BitmapFormat;
 
 let config = RenderConfig::new()
-    .scale(3.0)                         // 3x resolution
+    .dpi(300)                           // 300 DPI (default is 144)
     .max_width(4096)                    // clamp width, preserve aspect ratio
     .rotation(Rotation::Degrees90)      // rotate 90°
     .format(BitmapFormat::Bgr)          // 24-bit BGR (no alpha)
