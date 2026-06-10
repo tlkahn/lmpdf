@@ -9,6 +9,7 @@ pub enum Error {
     Page(PageError),
     Handle(HandleError),
     Render(RenderError),
+    Text(TextError),
 }
 
 #[derive(Debug)]
@@ -46,6 +47,11 @@ pub enum HandleError {
     Stale,
 }
 
+#[derive(Debug)]
+pub enum TextError {
+    LoadFailed,
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -54,6 +60,7 @@ impl fmt::Display for Error {
             Error::Page(e) => write!(f, "page error: {e}"),
             Error::Handle(e) => write!(f, "handle error: {e}"),
             Error::Render(e) => write!(f, "render error: {e}"),
+            Error::Text(e) => write!(f, "text error: {e}"),
         }
     }
 }
@@ -112,6 +119,14 @@ impl fmt::Display for HandleError {
     }
 }
 
+impl fmt::Display for TextError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TextError::LoadFailed => write!(f, "text page load failed"),
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl std::error::Error for Error {}
@@ -120,6 +135,7 @@ impl std::error::Error for DocumentError {}
 impl std::error::Error for PageError {}
 impl std::error::Error for HandleError {}
 impl std::error::Error for RenderError {}
+impl std::error::Error for TextError {}
 
 impl From<LibraryError> for Error {
     fn from(e: LibraryError) -> Self {
@@ -148,6 +164,12 @@ impl From<HandleError> for Error {
 impl From<RenderError> for Error {
     fn from(e: RenderError) -> Self {
         Error::Render(e)
+    }
+}
+
+impl From<TextError> for Error {
+    fn from(e: TextError) -> Self {
+        Error::Text(e)
     }
 }
 
@@ -268,10 +290,17 @@ mod tests {
             .into(),
             RenderError::BufferCopyFailed.into(),
             RenderError::ConversionFailed.into(),
+            TextError::LoadFailed.into(),
         ];
         for e in cases {
             assert!(!e.to_string().is_empty());
         }
+    }
+
+    #[test]
+    fn error_from_text_error() {
+        let e: Error = TextError::LoadFailed.into();
+        assert!(matches!(e, Error::Text(TextError::LoadFailed)));
     }
 
     #[test]

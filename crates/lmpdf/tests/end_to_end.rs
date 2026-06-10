@@ -380,6 +380,103 @@ fn coord_conversion_cross_document_error() {
     ));
 }
 
+// --- Text extraction tests ---
+
+fn born_digital_pdf() -> &'static [u8] {
+    include_bytes!("../../lmpdf-sys/tests/fixtures/born_digital.pdf")
+}
+
+fn scanned_pdf() -> &'static [u8] {
+    include_bytes!("../../lmpdf-sys/tests/fixtures/scanned.pdf")
+}
+
+#[test]
+#[ignore]
+fn test_page_text_born_digital() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let text = doc.page_text(0).unwrap();
+    assert!(
+        !text.is_empty(),
+        "page_text(0) should return non-empty text"
+    );
+    assert!(
+        text.contains("comprehensive survey of neural retrieval models"),
+        "expected substring not found in page 0 text"
+    );
+}
+
+#[test]
+#[ignore]
+fn test_page_text_scanned_empty() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(scanned_pdf(), None).unwrap();
+    let text = doc.page_text(0).unwrap();
+    assert!(
+        text.trim().is_empty(),
+        "scanned PDF page_text should be empty or whitespace, got: {text:?}"
+    );
+}
+
+#[test]
+#[ignore]
+fn test_page_text_out_of_bounds() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let result = doc.page_text(999);
+    assert!(result.is_err(), "page_text(999) should return Err");
+}
+
+// --- Metadata tests ---
+
+#[test]
+#[ignore]
+fn test_meta_returns_title() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let title = doc.meta("Title").unwrap();
+    assert_eq!(
+        title,
+        Some("Advances in Neural Retrieval Models for Scholarly Document Processing".to_string()),
+        "meta('Title') should return the PDF title"
+    );
+}
+
+#[test]
+#[ignore]
+fn test_meta_missing_returns_none() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let result = doc.meta("NonexistentKey").unwrap();
+    assert_eq!(result, None, "meta for missing key should return None");
+}
+
+#[test]
+#[ignore]
+fn test_info_collects_known_keys() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let info = doc.info().unwrap();
+    assert!(
+        info.contains_key("Title"),
+        "info() should contain 'Title' key, got keys: {:?}",
+        info.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        info.contains_key("Author"),
+        "info() should contain 'Author' key, got keys: {:?}",
+        info.keys().collect::<Vec<_>>()
+    );
+    assert_eq!(
+        info.get("Title").unwrap(),
+        "Advances in Neural Retrieval Models for Scholarly Document Processing"
+    );
+    assert_eq!(
+        info.get("Author").unwrap(),
+        "Dr. Elena Vasquez and Prof. Martin Chen"
+    );
+}
+
 // --- Re-export compile checks ---
 
 #[test]

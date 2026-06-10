@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -7,7 +8,7 @@ use slotmap::SlotMap;
 
 use crate::Result;
 use crate::bitmap::Bitmap;
-use crate::error::{DocumentError, Error, HandleError, PageError, RenderError};
+use crate::error::{DocumentError, Error, HandleError, PageError, RenderError, TextError};
 use crate::render::{RenderConfig, compute_target_dimensions};
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
@@ -220,6 +221,54 @@ impl Document {
             .map_err(|_| Error::Render(RenderError::ConversionFailed))
     }
 
+    pub fn page_text(&self, index: usize) -> Result<String> {
+        // Reuse page() to load/cache the page handle
+        let page_ref = self.page(index)?;
+        let page_data = self.resolve_page(page_ref)?;
+
+        let bindings = self.lib.bindings();
+        let text_page = bindings
+            .load_text_page(page_data.handle)
+            .map_err(|_| TextError::LoadFailed)?;
+
+        let count = bindings.text_count_chars(text_page);
+        let text = if count > 0 {
+            bindings.text_get_text(text_page, 0, count)
+        } else {
+            String::new()
+        };
+
+        bindings.close_text_page(text_page);
+        Ok(text)
+    }
+
+    pub fn meta(&self, tag: &str) -> Result<Option<String>> {
+        let bindings = self.lib.bindings();
+        bindings
+            .get_meta_text(self.handle, tag)
+            .map_err(|e| Error::Document(DocumentError::from(e)))
+    }
+
+    pub fn info(&self) -> Result<HashMap<String, String>> {
+        const KNOWN_KEYS: &[&str] = &[
+            "Title",
+            "Author",
+            "Subject",
+            "Keywords",
+            "Creator",
+            "Producer",
+            "CreationDate",
+            "ModDate",
+        ];
+        let mut map = HashMap::new();
+        for &key in KNOWN_KEYS {
+            if let Some(value) = self.meta(key)? {
+                map.insert(key.to_string(), value);
+            }
+        }
+        Ok(map)
+    }
+
     fn resolve_page(&self, r: PageRef) -> Result<PageData> {
         resolve_page_inner(self.id, &self.pages.borrow(), r)
     }
@@ -383,5 +432,42 @@ mod tests {
             doc.page_to_device(page_ref, config, 0.0, 0.0)
         }
         let _ = assert_method;
+    }
+
+    #[test]
+    fn page_text_signature_exists() {
+        fn assert_sig(doc: &Document) -> Result<String> {
+            doc.page_text(0)
+        }
+        let _ = assert_sig;
+    }
+
+    #[test]
+    fn page_text_out_of_bounds_returns_error() {
+        // This test will fail to compile until page_text exists.
+        // Once it compiles, it needs a Document to test against.
+        // Since Document requires pdfium, this is a compile-check only;
+        // the actual out-of-bounds behavior is validated in the integration test.
+        fn assert_returns_err(doc: &Document) {
+            let result = doc.page_text(999);
+            let _ = result; // can't run without pdfium, just verify it compiles
+        }
+        let _ = assert_returns_err;
+    }
+
+    #[test]
+    fn meta_signature_exists() {
+        fn assert_sig(doc: &Document) -> Result<Option<String>> {
+            doc.meta("Title")
+        }
+        let _ = assert_sig;
+    }
+
+    #[test]
+    fn info_signature_exists() {
+        fn assert_sig(doc: &Document) -> Result<std::collections::HashMap<String, String>> {
+            doc.info()
+        }
+        let _ = assert_sig;
     }
 }
