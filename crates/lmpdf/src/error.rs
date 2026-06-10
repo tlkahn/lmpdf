@@ -50,6 +50,7 @@ pub enum HandleError {
 #[derive(Debug)]
 pub enum TextError {
     LoadFailed,
+    CharCountFailed,
 }
 
 impl fmt::Display for Error {
@@ -123,6 +124,7 @@ impl fmt::Display for TextError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TextError::LoadFailed => write!(f, "text page load failed"),
+            TextError::CharCountFailed => write!(f, "character count failed"),
         }
     }
 }
@@ -291,6 +293,7 @@ mod tests {
             RenderError::BufferCopyFailed.into(),
             RenderError::ConversionFailed.into(),
             TextError::LoadFailed.into(),
+            TextError::CharCountFailed.into(),
         ];
         for e in cases {
             assert!(!e.to_string().is_empty());
@@ -301,6 +304,14 @@ mod tests {
     fn error_from_text_error() {
         let e: Error = TextError::LoadFailed.into();
         assert!(matches!(e, Error::Text(TextError::LoadFailed)));
+    }
+
+    #[test]
+    fn text_error_char_count_failed_display() {
+        let e = TextError::CharCountFailed;
+        assert!(!e.to_string().is_empty());
+        let e: Error = e.into();
+        assert!(matches!(e, Error::Text(TextError::CharCountFailed)));
     }
 
     #[test]

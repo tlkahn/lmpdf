@@ -232,6 +232,10 @@ impl Document {
             .map_err(|_| TextError::LoadFailed)?;
 
         let count = bindings.text_count_chars(text_page);
+        if count < 0 {
+            bindings.close_text_page(text_page);
+            return Err(TextError::CharCountFailed.into());
+        }
         let text = if count > 0 {
             bindings.text_get_text(text_page, 0, count)
         } else {
@@ -469,5 +473,11 @@ mod tests {
             doc.info()
         }
         let _ = assert_sig;
+    }
+
+    #[test]
+    fn text_error_char_count_failed_variant_exists() {
+        let err: Error = TextError::CharCountFailed.into();
+        assert!(matches!(err, Error::Text(TextError::CharCountFailed)));
     }
 }
