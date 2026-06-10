@@ -137,4 +137,9 @@ mod tests {
         fn accepts<B: PdfiumBindings>(_: &SafeBindings<B>) {}
         let _ = accepts::<DynamicBindings>;
     }
+
+    #[test]
+    fn text_page_handle_exists() {
+        let _: TextPageHandle;
+    }
 }

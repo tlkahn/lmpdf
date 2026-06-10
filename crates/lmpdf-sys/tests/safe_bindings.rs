@@ -122,3 +122,77 @@ fn safe_render_page_bitmap_no_crash() {
     sb.close_document(doc);
     sb.destroy_library();
 }
+
+#[test]
+#[ignore]
+fn test_text_extraction_returns_nonempty_string() {
+    let sb = make_bindings();
+    let pdf = include_bytes!("fixtures/born_digital.pdf");
+    let doc = sb.load_mem_document(pdf, None).unwrap();
+    let page = sb.load_page(doc, 0).unwrap();
+    let text_page = sb.load_text_page(page).unwrap();
+    let count = sb.text_count_chars(text_page);
+    assert!(
+        count > 0,
+        "born_digital page 0 should have chars, got {count}"
+    );
+    let text = sb.text_get_text(text_page, 0, count);
+    assert!(!text.is_empty(), "extracted text should not be empty");
+    assert!(
+        text.contains("comprehensive survey of neural retrieval models"),
+        "expected substring not found in extracted text"
+    );
+    sb.close_text_page(text_page);
+    sb.close_page(page);
+    sb.close_document(doc);
+    sb.destroy_library();
+}
+
+#[test]
+#[ignore]
+fn test_text_extraction_scanned_returns_empty() {
+    let sb = make_bindings();
+    let pdf = include_bytes!("fixtures/scanned.pdf");
+    let doc = sb.load_mem_document(pdf, None).unwrap();
+    let page = sb.load_page(doc, 0).unwrap();
+    let text_page = sb.load_text_page(page).unwrap();
+    let count = sb.text_count_chars(text_page);
+    assert!(count <= 0, "scanned PDF should have 0 chars, got {count}");
+    let text = sb.text_get_text(text_page, 0, count.max(0));
+    assert!(
+        text.trim().is_empty(),
+        "scanned PDF text should be empty, got: {text:?}"
+    );
+    sb.close_text_page(text_page);
+    sb.close_page(page);
+    sb.close_document(doc);
+    sb.destroy_library();
+}
+
+#[test]
+#[ignore]
+fn test_meta_text_returns_title() {
+    let sb = make_bindings();
+    let pdf = include_bytes!("fixtures/born_digital.pdf");
+    let doc = sb.load_mem_document(pdf, None).unwrap();
+    let title = sb.get_meta_text(doc, "Title").unwrap();
+    assert_eq!(
+        title,
+        Some("Advances in Neural Retrieval Models for Scholarly Document Processing".to_string()),
+        "Title metadata should match"
+    );
+    sb.close_document(doc);
+    sb.destroy_library();
+}
+
+#[test]
+#[ignore]
+fn test_meta_text_missing_key_returns_none() {
+    let sb = make_bindings();
+    let pdf = include_bytes!("fixtures/born_digital.pdf");
+    let doc = sb.load_mem_document(pdf, None).unwrap();
+    let result = sb.get_meta_text(doc, "NonexistentKey").unwrap();
+    assert_eq!(result, None, "missing key should return None");
+    sb.close_document(doc);
+    sb.destroy_library();
+}

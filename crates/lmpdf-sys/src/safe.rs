@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::fmt;
 use std::os::raw::{c_double, c_int, c_ulong, c_void};
 
-use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, PdfiumBindings};
+use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, FPDF_TEXTPAGE, PdfiumBindings};
 
 #[derive(Debug, Clone, Copy)]
 pub struct DocHandle(FPDF_DOCUMENT);
@@ -39,6 +39,19 @@ impl BitmapHandle {
         Self(ptr)
     }
     pub fn as_raw(self) -> FPDF_BITMAP {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TextPageHandle(FPDF_TEXTPAGE);
+impl TextPageHandle {
+    /// # Safety
+    /// `ptr` must be a valid, non-null `FPDF_TEXTPAGE` returned by Pdfium.
+    pub unsafe fn from_raw(ptr: FPDF_TEXTPAGE) -> Self {
+        Self(ptr)
+    }
+    pub fn as_raw(self) -> FPDF_TEXTPAGE {
         self.0
     }
 }
@@ -329,6 +342,77 @@ impl<B: PdfiumBindings> SafeBindings<B> {
             Ok((device_x, device_y))
         }
     }
+
+    pub fn load_text_page(&self, page: PageHandle) -> Result<TextPageHandle, SysError> {
+        let tp = unsafe { self.raw.FPDFText_LoadPage(page.as_raw()) };
+        if tp.is_null() {
+            Err(self.from_last_error())
+        } else {
+            Ok(unsafe { TextPageHandle::from_raw(tp) })
+        }
+    }
+
+    pub fn close_text_page(&self, text_page: TextPageHandle) {
+        unsafe { self.raw.FPDFText_ClosePage(text_page.as_raw()) }
+    }
+
+    pub fn text_count_chars(&self, text_page: TextPageHandle) -> c_int {
+        unsafe { self.raw.FPDFText_CountChars(text_page.as_raw()) }
+    }
+
+    pub fn text_get_text(
+        &self,
+        text_page: TextPageHandle,
+        start_index: c_int,
+        count: c_int,
+    ) -> String {
+        if count <= 0 {
+            return String::new();
+        }
+        // FPDFText_GetText writes `count` UTF-16LE code units plus a null terminator
+        let buf_len = (count + 1) as usize;
+        let mut buf: Vec<u16> = vec![0u16; buf_len];
+        unsafe {
+            self.raw
+                .FPDFText_GetText(text_page.as_raw(), start_index, count, buf.as_mut_ptr());
+        }
+        // Strip trailing null(s)
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        String::from_utf16_lossy(&buf[..end])
+    }
+
+    pub fn get_meta_text(&self, doc: DocHandle, tag: &str) -> Result<Option<String>, SysError> {
+        let tag_cstring = CString::new(tag).map_err(|e| SysError::NullInterior(e.to_string()))?;
+
+        // First pass: get required buffer size in bytes
+        let needed = unsafe {
+            self.raw
+                .FPDF_GetMetaText(doc.as_raw(), tag_cstring.as_ptr(), std::ptr::null_mut(), 0)
+        };
+
+        // 0 means error/not found; 2 means just the null terminator (empty value)
+        if needed == 0 || needed == 2 {
+            return Ok(None);
+        }
+
+        // Allocate buffer as Vec<u16> for proper alignment, then cast for the FFI call
+        let u16_len = (needed as usize) / 2;
+        let mut buf: Vec<u16> = vec![0u16; u16_len];
+        unsafe {
+            self.raw.FPDF_GetMetaText(
+                doc.as_raw(),
+                tag_cstring.as_ptr(),
+                buf.as_mut_ptr() as *mut c_void,
+                needed,
+            );
+        }
+
+        // Strip trailing null terminator
+        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+        let s = String::from_utf16_lossy(&buf[..end]);
+
+        if s.is_empty() { Ok(None) } else { Ok(Some(s)) }
+    }
 }
 
 #[cfg(test)]
@@ -452,5 +536,70 @@ mod tests {
         let ptr: FPDF_BITMAP = std::ptr::null_mut();
         let handle = unsafe { BitmapHandle::from_raw(ptr) };
         assert_eq!(handle.as_raw(), ptr);
+    }
+
+    #[test]
+    fn text_page_handle_is_copy_clone_debug() {
+        fn assert_traits<T: Copy + Clone + std::fmt::Debug>() {}
+        assert_traits::<TextPageHandle>();
+    }
+
+    #[test]
+    fn text_page_handle_roundtrips_raw_pointer() {
+        let ptr: crate::FPDF_TEXTPAGE = std::ptr::null_mut();
+        let handle = unsafe { TextPageHandle::from_raw(ptr) };
+        assert_eq!(handle.as_raw(), ptr);
+    }
+
+    #[test]
+    fn load_text_page_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            page: PageHandle,
+        ) -> Result<TextPageHandle, SysError> {
+            sb.load_text_page(page)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn close_text_page_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(sb: &SafeBindings<B>, tp: TextPageHandle) {
+            sb.close_text_page(tp);
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn text_count_chars_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(sb: &SafeBindings<B>, tp: TextPageHandle) -> c_int {
+            sb.text_count_chars(tp)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn text_get_text_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            tp: TextPageHandle,
+            start: c_int,
+            count: c_int,
+        ) -> String {
+            sb.text_get_text(tp, start, count)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn get_meta_text_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            doc: DocHandle,
+            tag: &str,
+        ) -> Result<Option<String>, SysError> {
+            sb.get_meta_text(doc, tag)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
     }
 }

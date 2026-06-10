@@ -1,8 +1,8 @@
-use std::os::raw::{c_double, c_int, c_ulong, c_void};
+use std::os::raw::{c_double, c_int, c_ulong, c_ushort, c_void};
 
 use super::{
     FPDF_BITMAP, FPDF_BOOL, FPDF_BYTESTRING, FPDF_DOCUMENT, FPDF_DWORD, FPDF_LIBRARY_CONFIG,
-    FPDF_PAGE, FPDF_STRING, FS_MATRIX, FS_RECTF,
+    FPDF_PAGE, FPDF_STRING, FPDF_TEXTPAGE, FS_MATRIX, FS_RECTF,
 };
 
 lmpdf_sys_macros::pdfium_ffi! {
@@ -29,6 +29,15 @@ lmpdf_sys_macros::pdfium_ffi! {
     fn FPDF_GetPageWidth(page: FPDF_PAGE) -> c_double;
     fn FPDF_GetPageHeight(page: FPDF_PAGE) -> c_double;
     fn FPDF_GetPageBoundingBox(page: FPDF_PAGE, rect: *mut FS_RECTF) -> FPDF_BOOL;
+
+    // Text
+    fn FPDFText_LoadPage(page: FPDF_PAGE) -> FPDF_TEXTPAGE;
+    fn FPDFText_ClosePage(text_page: FPDF_TEXTPAGE);
+    fn FPDFText_CountChars(text_page: FPDF_TEXTPAGE) -> c_int;
+    fn FPDFText_GetText(text_page: FPDF_TEXTPAGE, start_index: c_int, count: c_int, result: *mut c_ushort) -> c_int;
+
+    // Metadata
+    fn FPDF_GetMetaText(document: FPDF_DOCUMENT, tag: FPDF_BYTESTRING, buffer: *mut c_void, buflen: c_ulong) -> c_ulong;
 
     // Bitmap
     fn FPDFBitmap_Create(width: c_int, height: c_int, alpha: c_int) -> FPDF_BITMAP;
