@@ -222,7 +222,13 @@ impl Document {
     }
 
     pub fn page_text(&self, index: usize) -> Result<String> {
-        // Reuse page() to load/cache the page handle
+        // NOTE: This reuses page() which caches the FPDF_PAGE handle in the
+        // SlotMap until Document::drop. For text-only extraction the handle
+        // is not needed after this call, but the cost is bounded (max_pages
+        // is typically 5, and the viewer renders the same low-index pages
+        // anyway). A transient load→extract→close path would avoid cache
+        // pollution but would add a second handle-lifecycle strategy; defer
+        // until a proper page cache eviction design is warranted.
         let page_ref = self.page(index)?;
         let page_data = self.resolve_page(page_ref)?;
 
