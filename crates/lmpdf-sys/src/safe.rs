@@ -98,6 +98,13 @@ impl fmt::Display for SysError {
 
 impl std::error::Error for SysError {}
 
+/// Decode a UTF-16LE buffer, stripping only trailing NUL (U+0000) code units.
+/// Interior NULs are preserved — they are valid Unicode and must not cause truncation.
+fn decode_utf16_buf(buf: &[u16]) -> String {
+    let end = buf.iter().rposition(|&c| c != 0).map_or(0, |p| p + 1);
+    String::from_utf16_lossy(&buf[..end])
+}
+
 pub struct SafeBindings<B> {
     raw: B,
 }
@@ -376,9 +383,7 @@ impl<B: PdfiumBindings> SafeBindings<B> {
             self.raw
                 .FPDFText_GetText(text_page.as_raw(), start_index, count, buf.as_mut_ptr());
         }
-        // Strip trailing null(s)
-        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-        String::from_utf16_lossy(&buf[..end])
+        decode_utf16_buf(&buf)
     }
 
     pub fn get_meta_text(&self, doc: DocHandle, tag: &str) -> Result<Option<String>, SysError> {
@@ -408,9 +413,7 @@ impl<B: PdfiumBindings> SafeBindings<B> {
             );
         }
 
-        // Strip trailing null terminator
-        let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
-        let s = String::from_utf16_lossy(&buf[..end]);
+        let s = decode_utf16_buf(&buf);
 
         if s.is_empty() { Ok(None) } else { Ok(Some(s)) }
     }
@@ -602,6 +605,30 @@ mod tests {
             sb.get_meta_text(doc, tag)
         }
         let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn decode_utf16_buf_strips_only_trailing_nuls() {
+        // Simulates: "AB\0CD\0\0" (interior NUL at index 2, trailing NULs at 5-6)
+        // Expected: the interior NUL is preserved; only trailing NULs stripped
+        let buf: Vec<u16> = vec![0x0041, 0x0042, 0x0000, 0x0043, 0x0044, 0x0000, 0x0000];
+        let result = decode_utf16_buf(&buf);
+        // Interior NUL becomes '\0' in the Rust String — that's correct
+        assert_eq!(result, "AB\0CD");
+    }
+
+    #[test]
+    fn decode_utf16_buf_all_nuls_returns_empty() {
+        let buf: Vec<u16> = vec![0x0000, 0x0000, 0x0000];
+        let result = decode_utf16_buf(&buf);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn decode_utf16_buf_no_nuls_returns_full_string() {
+        let buf: Vec<u16> = vec![0x0048, 0x0065, 0x006C, 0x006C, 0x006F]; // "Hello"
+        let result = decode_utf16_buf(&buf);
+        assert_eq!(result, "Hello");
     }
 
     #[test]
