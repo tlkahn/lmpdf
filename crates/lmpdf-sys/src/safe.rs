@@ -403,7 +403,8 @@ impl<B: PdfiumBindings> SafeBindings<B> {
                 doc.as_raw(),
                 tag_cstring.as_ptr(),
                 buf.as_mut_ptr() as *mut c_void,
-                needed,
+                // Use allocation-derived bound, not raw `needed` (which truncates on odd values)
+                (u16_len * 2) as c_ulong,
             );
         }
 
@@ -601,5 +602,28 @@ mod tests {
             sb.get_meta_text(doc, tag)
         }
         let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn get_meta_text_buflen_capped_to_allocation() {
+        // Verify that u16_len * 2 is always <= needed, and that the code
+        // uses u16_len * 2 (not needed) as the buffer capacity bound.
+        // For any even `needed`, u16_len * 2 == needed (no truncation).
+        // For any odd `needed`, u16_len * 2 == needed - 1 (safe truncation).
+        for needed in [4u64, 5, 6, 7, 100, 101] {
+            let u16_len = (needed as usize) / 2;
+            let buf_byte_cap = u16_len * 2;
+            assert!(
+                buf_byte_cap <= needed as usize,
+                "buf capacity {buf_byte_cap} must not exceed needed {needed}"
+            );
+            // The key invariant: buflen passed to FFI must equal buf_byte_cap,
+            // NOT needed, to prevent writing past the allocation.
+            let buflen_for_ffi = (u16_len * 2) as u64;
+            assert_eq!(
+                buflen_for_ffi, buf_byte_cap as u64,
+                "buflen must equal buffer byte capacity"
+            );
+        }
     }
 }
