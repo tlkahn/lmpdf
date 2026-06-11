@@ -9,6 +9,10 @@ fn hello_pdf() -> &'static [u8] {
     include_bytes!("../../lmpdf-sys/tests/fixtures/hello.pdf")
 }
 
+fn hello_pdf_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../lmpdf-sys/tests/fixtures/hello.pdf")
+}
+
 #[test]
 #[ignore]
 fn pdfium_open_succeeds() {
@@ -246,9 +250,7 @@ fn render_page_out_of_bounds() {
 #[ignore]
 fn open_document_from_path() {
     let p = Pdfium::open(pdfium_path()).unwrap();
-    let doc = p
-        .open_document("crates/lmpdf-sys/tests/fixtures/hello.pdf", None)
-        .unwrap();
+    let doc = p.open_document(hello_pdf_path(), None).unwrap();
     assert_eq!(doc.page_count(), 1);
 }
 
