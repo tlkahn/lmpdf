@@ -477,6 +477,74 @@ fn test_info_collects_known_keys() {
     );
 }
 
+// --- delete_page / save_to_vec / truncate tests ---
+
+#[test]
+#[ignore]
+fn delete_page_decrements_page_count() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(
+        original >= 2,
+        "need multi-page PDF for this test, got {original}"
+    );
+    doc.delete_page(0).unwrap();
+    assert_eq!(doc.page_count(), original - 1);
+}
+
+#[test]
+#[ignore]
+fn truncate_removes_lead_and_trail_pages() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(
+        original >= 3,
+        "need >= 3 pages for truncate(1,1) test, got {original}"
+    );
+    doc.truncate(1, 1).unwrap();
+    assert_eq!(doc.page_count(), original - 2);
+}
+
+#[test]
+#[ignore]
+fn truncate_excessive_returns_error() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(hello_pdf(), None).unwrap();
+    assert_eq!(doc.page_count(), 1);
+    let result = doc.truncate(1, 0);
+    assert!(result.is_err(), "truncate(1,0) on 1-page doc should fail");
+}
+
+#[test]
+#[ignore]
+fn save_after_delete_produces_valid_pdf() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 2, "need multi-page PDF, got {original}");
+    doc.delete_page(0).unwrap();
+    let bytes = doc.save_to_vec().unwrap();
+    assert!(bytes.starts_with(b"%PDF"));
+    // Reload and verify
+    let doc2 = p.load_document(&bytes, None).unwrap();
+    assert_eq!(doc2.page_count(), original - 1);
+}
+
+#[test]
+#[ignore]
+fn save_to_vec_produces_valid_pdf() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let bytes = doc.save_to_vec().unwrap();
+    assert!(!bytes.is_empty(), "saved PDF should be non-empty");
+    assert!(
+        bytes.starts_with(b"%PDF"),
+        "saved PDF should start with %PDF header"
+    );
+}
+
 // --- Re-export compile checks ---
 
 #[test]

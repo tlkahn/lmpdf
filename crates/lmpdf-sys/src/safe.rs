@@ -2,7 +2,10 @@ use std::ffi::CString;
 use std::fmt;
 use std::os::raw::{c_double, c_int, c_ulong, c_void};
 
-use crate::{FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_PAGE, FPDF_TEXTPAGE, PdfiumBindings};
+use crate::{
+    FPDF_BITMAP, FPDF_DOCUMENT, FPDF_DWORD, FPDF_FILEWRITE, FPDF_PAGE, FPDF_TEXTPAGE,
+    PdfiumBindings,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct DocHandle(FPDF_DOCUMENT);
@@ -417,6 +420,49 @@ impl<B: PdfiumBindings> SafeBindings<B> {
 
         if s.is_empty() { Ok(None) } else { Ok(Some(s)) }
     }
+
+    pub fn delete_page(&self, doc: DocHandle, page_index: c_int) {
+        unsafe { self.raw.FPDFPage_Delete(doc.as_raw(), page_index) }
+    }
+
+    pub fn import_pages(
+        &self,
+        dest: DocHandle,
+        src: DocHandle,
+        pagerange: Option<&str>,
+        index: c_int,
+    ) -> Result<(), SysError> {
+        let pagerange_cstring = pagerange
+            .map(|p| CString::new(p).map_err(|e| SysError::NullInterior(e.to_string())))
+            .transpose()?;
+        let pagerange_ptr = pagerange_cstring
+            .as_ref()
+            .map_or(std::ptr::null(), |c| c.as_ptr());
+
+        let ok = unsafe {
+            self.raw
+                .FPDF_ImportPages(dest.as_raw(), src.as_raw(), pagerange_ptr, index)
+        };
+        if ok == 0 {
+            Err(self.from_last_error())
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn save_to_writer(
+        &self,
+        doc: DocHandle,
+        writer: *mut FPDF_FILEWRITE,
+        flags: FPDF_DWORD,
+    ) -> Result<(), SysError> {
+        let ok = unsafe { self.raw.FPDF_SaveAsCopy(doc.as_raw(), writer, flags) };
+        if ok == 0 {
+            Err(self.from_last_error())
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -652,5 +698,75 @@ mod tests {
                 "buflen must equal buffer byte capacity"
             );
         }
+    }
+
+    #[test]
+    fn delete_page_safe_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(sb: &SafeBindings<B>, doc: DocHandle, idx: c_int) {
+            sb.delete_page(doc, idx);
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn delete_page_trait_method_exists() {
+        fn assert_method<B: PdfiumBindings>(b: &B, doc: crate::FPDF_DOCUMENT, idx: c_int) {
+            unsafe { b.FPDFPage_Delete(doc, idx) };
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn import_pages_safe_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            dest: DocHandle,
+            src: DocHandle,
+            pagerange: Option<&str>,
+            idx: c_int,
+        ) -> Result<(), SysError> {
+            sb.import_pages(dest, src, pagerange, idx)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn import_pages_trait_method_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            b: &B,
+            dest: crate::FPDF_DOCUMENT,
+            src: crate::FPDF_DOCUMENT,
+            range: crate::FPDF_BYTESTRING,
+            idx: c_int,
+        ) -> crate::FPDF_BOOL {
+            unsafe { b.FPDF_ImportPages(dest, src, range, idx) }
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn save_to_writer_safe_signature_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            sb: &SafeBindings<B>,
+            doc: DocHandle,
+            writer: *mut crate::FPDF_FILEWRITE,
+            flags: crate::FPDF_DWORD,
+        ) -> Result<(), SysError> {
+            sb.save_to_writer(doc, writer, flags)
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
+    }
+
+    #[test]
+    fn save_as_copy_trait_method_exists() {
+        fn assert_method<B: PdfiumBindings>(
+            b: &B,
+            doc: crate::FPDF_DOCUMENT,
+            fw: *mut crate::FPDF_FILEWRITE,
+            flags: crate::FPDF_DWORD,
+        ) -> crate::FPDF_BOOL {
+            unsafe { b.FPDF_SaveAsCopy(doc, fw, flags) }
+        }
+        let _ = assert_method::<crate::DynamicBindings>;
     }
 }

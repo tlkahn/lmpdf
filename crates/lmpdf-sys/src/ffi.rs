@@ -1,8 +1,8 @@
 use std::os::raw::{c_double, c_int, c_ulong, c_ushort, c_void};
 
 use super::{
-    FPDF_BITMAP, FPDF_BOOL, FPDF_BYTESTRING, FPDF_DOCUMENT, FPDF_DWORD, FPDF_LIBRARY_CONFIG,
-    FPDF_PAGE, FPDF_STRING, FPDF_TEXTPAGE, FS_MATRIX, FS_RECTF,
+    FPDF_BITMAP, FPDF_BOOL, FPDF_BYTESTRING, FPDF_DOCUMENT, FPDF_DWORD, FPDF_FILEWRITE,
+    FPDF_LIBRARY_CONFIG, FPDF_PAGE, FPDF_STRING, FPDF_TEXTPAGE, FS_MATRIX, FS_RECTF,
 };
 
 lmpdf_sys_macros::pdfium_ffi! {
@@ -55,4 +55,13 @@ lmpdf_sys_macros::pdfium_ffi! {
     fn FPDF_RenderPageBitmapWithMatrix(bitmap: FPDF_BITMAP, page: FPDF_PAGE, matrix: *const FS_MATRIX, clipping: *const FS_RECTF, flags: c_int);
     fn FPDF_DeviceToPage(page: FPDF_PAGE, start_x: c_int, start_y: c_int, size_x: c_int, size_y: c_int, rotate: c_int, device_x: c_int, device_y: c_int, page_x: *mut c_double, page_y: *mut c_double) -> FPDF_BOOL;
     fn FPDF_PageToDevice(page: FPDF_PAGE, start_x: c_int, start_y: c_int, size_x: c_int, size_y: c_int, rotate: c_int, page_x: c_double, page_y: c_double, device_x: *mut c_int, device_y: *mut c_int) -> FPDF_BOOL;
+
+    // Page editing (fpdf_edit.h)
+    fn FPDFPage_Delete(document: FPDF_DOCUMENT, page_index: c_int);
+
+    // Page import (fpdf_ppo.h)
+    fn FPDF_ImportPages(dest_doc: FPDF_DOCUMENT, src_doc: FPDF_DOCUMENT, pagerange: FPDF_BYTESTRING, index: c_int) -> FPDF_BOOL;
+
+    // Save (fpdf_save.h)
+    fn FPDF_SaveAsCopy(document: FPDF_DOCUMENT, file_write: *mut FPDF_FILEWRITE, flags: FPDF_DWORD) -> FPDF_BOOL;
 }
