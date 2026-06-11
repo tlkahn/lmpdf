@@ -202,8 +202,11 @@ impl From<SaveError> for Error {
 }
 
 impl From<SysError> for SaveError {
-    fn from(_e: SysError) -> Self {
-        SaveError::WriteFailed
+    fn from(e: SysError) -> Self {
+        match e {
+            SysError::Unknown => SaveError::WriteFailed,
+            other => SaveError::IoError(other.to_string()),
+        }
     }
 }
 
@@ -412,6 +415,52 @@ mod tests {
             e2,
             Error::Document(DocumentError::TruncationError(_))
         ));
+    }
+
+    #[test]
+    fn save_error_from_sys_error_preserves_detail() {
+        let e = SaveError::from(SysError::FileNotFound);
+        assert!(
+            matches!(e, SaveError::IoError(ref s) if s.contains("file not found")),
+            "FileNotFound should map to IoError with detail, got: {e:?}"
+        );
+
+        let e2 = SaveError::from(SysError::InvalidFormat);
+        assert!(
+            matches!(e2, SaveError::IoError(ref s) if s.contains("invalid")),
+            "InvalidFormat should map to IoError with detail, got: {e2:?}"
+        );
+    }
+
+    #[test]
+    fn save_error_from_sys_error_all_variants() {
+        // Unknown -> WriteFailed (generic write failure)
+        assert!(matches!(
+            SaveError::from(SysError::Unknown),
+            SaveError::WriteFailed
+        ));
+
+        // All other variants -> IoError with descriptive message
+        let cases = vec![
+            SysError::FileNotFound,
+            SysError::InvalidFormat,
+            SysError::IncorrectPassword,
+            SysError::UnsupportedSecurity,
+            SysError::PageNotFound,
+            SysError::NullInterior("test".into()),
+            SysError::LoadFailed("lib".into()),
+        ];
+        for sys_err in cases {
+            let display = sys_err.to_string();
+            let save_err = SaveError::from(sys_err);
+            match save_err {
+                SaveError::IoError(ref s) => assert!(
+                    s.contains(&display) || display.contains(s),
+                    "IoError should carry source detail, got: {s}"
+                ),
+                other => panic!("expected IoError, got {other:?}"),
+            }
+        }
     }
 
     #[test]

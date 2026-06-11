@@ -545,6 +545,46 @@ fn save_to_vec_produces_valid_pdf() {
     );
 }
 
+// --- delete_page / truncate PageRef preservation tests ---
+
+#[test]
+#[ignore]
+fn delete_page_preserves_later_page_refs() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 3, "need >= 3 pages, got {original}");
+    // Cache page at index 2
+    let r2 = doc.page(2).unwrap();
+    let w2 = doc.page_width(r2).unwrap();
+    // Delete page 0 (earlier page)
+    doc.delete_page(0).unwrap();
+    // r2 should still resolve (not Stale), and width should match
+    let w2_after = doc.page_width(r2).unwrap();
+    assert_eq!(
+        w2, w2_after,
+        "page width should be unchanged after earlier page deleted"
+    );
+}
+
+#[test]
+#[ignore]
+fn truncate_preserves_interior_page_refs() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 4, "need >= 4 pages, got {original}");
+    // Cache an interior page
+    let r = doc.page(2).unwrap();
+    let w = doc.page_width(r).unwrap();
+    // Truncate lead=1, trail=1
+    doc.truncate(1, 1).unwrap();
+    // The interior page ref should still be valid
+    let w_after = doc.page_width(r).unwrap();
+    assert_eq!(w, w_after, "interior page ref should survive truncation");
+    assert_eq!(doc.page_count(), original - 2);
+}
+
 // --- Re-export compile checks ---
 
 #[test]

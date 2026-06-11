@@ -320,12 +320,13 @@ impl Document {
         let pages = self.pages.get_mut();
         let bindings = self.lib.bindings();
 
-        // Close page at deleted index and all subsequent pages (handles become stale)
-        for i in index..map.len() {
-            if let Some(key) = map[i].take() {
-                if let Some(data) = pages.remove(key) {
-                    bindings.close_page(data.handle);
-                }
+        // Close only the deleted page's cached handle (if any).
+        // Later pages' FPDF_PAGE handles remain valid (Pdfium page objects
+        // are independent of their index in the page tree); their slotmap
+        // keys are preserved so existing PageRefs stay usable.
+        if let Some(key) = map[index] {
+            if let Some(data) = pages.remove(key) {
+                bindings.close_page(data.handle);
             }
         }
 
@@ -349,9 +350,9 @@ impl Document {
         for _ in 0..trail {
             self.delete_page(self.page_count - 1)?;
         }
-        // Delete lead pages from the front
-        for _ in 0..lead {
-            self.delete_page(0)?;
+        // Delete lead pages back-to-front (avoids repeated O(n) Vec::remove(0) shifts)
+        for i in (0..lead).rev() {
+            self.delete_page(i)?;
         }
         Ok(())
     }
