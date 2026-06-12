@@ -450,7 +450,13 @@ impl<B: PdfiumBindings> SafeBindings<B> {
         }
     }
 
-    pub fn save_to_writer(
+    /// # Safety
+    ///
+    /// `writer` must point to a valid `FPDF_FILEWRITE` whose `WriteBlock`
+    /// callback (and any trailing user data it relies on) stays alive and
+    /// valid for the entire duration of this call. Pdfium dereferences the
+    /// pointer and invokes the callback synchronously while saving.
+    pub unsafe fn save_to_writer(
         &self,
         doc: DocHandle,
         writer: *mut FPDF_FILEWRITE,
@@ -752,7 +758,7 @@ mod tests {
             writer: *mut crate::FPDF_FILEWRITE,
             flags: crate::FPDF_DWORD,
         ) -> Result<(), SysError> {
-            sb.save_to_writer(doc, writer, flags)
+            unsafe { sb.save_to_writer(doc, writer, flags) }
         }
         let _ = assert_method::<crate::DynamicBindings>;
     }

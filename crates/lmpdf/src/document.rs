@@ -324,10 +324,8 @@ impl Document {
         // Later pages' FPDF_PAGE handles remain valid (Pdfium page objects
         // are independent of their index in the page tree); their slotmap
         // keys are preserved so existing PageRefs stay usable.
-        if let Some(key) = map[index] {
-            if let Some(data) = pages.remove(key) {
-                bindings.close_page(data.handle);
-            }
+        if let Some(data) = map[index].and_then(|key| pages.remove(key)) {
+            bindings.close_page(data.handle);
         }
 
         // Remove the index entry (shifts subsequent entries left)
@@ -368,13 +366,18 @@ impl Document {
         };
 
         let bindings = self.lib.bindings();
-        bindings
-            .save_to_writer(
+        // SAFETY: `writer` lives on this stack frame for the whole call;
+        // `header` is its first field (#[repr(C)]), so the pointer is valid
+        // for Pdfium's synchronous WriteBlock callback, which only runs
+        // before save_to_writer returns.
+        unsafe {
+            bindings.save_to_writer(
                 self.handle,
                 &mut writer.header as *mut FPDF_FILEWRITE_,
                 0, // flags: 0 = full save
             )
-            .map_err(|e| Error::Save(SaveError::from(e)))?;
+        }
+        .map_err(|e| Error::Save(SaveError::from(e)))?;
 
         Ok(output)
     }
