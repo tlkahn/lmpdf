@@ -9,6 +9,10 @@ fn hello_pdf() -> &'static [u8] {
     include_bytes!("../../lmpdf-sys/tests/fixtures/hello.pdf")
 }
 
+fn hello_pdf_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../lmpdf-sys/tests/fixtures/hello.pdf")
+}
+
 #[test]
 #[ignore]
 fn pdfium_open_succeeds() {
@@ -246,9 +250,7 @@ fn render_page_out_of_bounds() {
 #[ignore]
 fn open_document_from_path() {
     let p = Pdfium::open(pdfium_path()).unwrap();
-    let doc = p
-        .open_document("crates/lmpdf-sys/tests/fixtures/hello.pdf", None)
-        .unwrap();
+    let doc = p.open_document(hello_pdf_path(), None).unwrap();
     assert_eq!(doc.page_count(), 1);
 }
 
@@ -475,6 +477,114 @@ fn test_info_collects_known_keys() {
         info.get("Author").unwrap(),
         "Dr. Elena Vasquez and Prof. Martin Chen"
     );
+}
+
+// --- delete_page / save_to_vec / truncate tests ---
+
+#[test]
+#[ignore]
+fn delete_page_decrements_page_count() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(
+        original >= 2,
+        "need multi-page PDF for this test, got {original}"
+    );
+    doc.delete_page(0).unwrap();
+    assert_eq!(doc.page_count(), original - 1);
+}
+
+#[test]
+#[ignore]
+fn truncate_removes_lead_and_trail_pages() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(
+        original >= 3,
+        "need >= 3 pages for truncate(1,1) test, got {original}"
+    );
+    doc.truncate(1, 1).unwrap();
+    assert_eq!(doc.page_count(), original - 2);
+}
+
+#[test]
+#[ignore]
+fn truncate_excessive_returns_error() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(hello_pdf(), None).unwrap();
+    assert_eq!(doc.page_count(), 1);
+    let result = doc.truncate(1, 0);
+    assert!(result.is_err(), "truncate(1,0) on 1-page doc should fail");
+}
+
+#[test]
+#[ignore]
+fn save_after_delete_produces_valid_pdf() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 2, "need multi-page PDF, got {original}");
+    doc.delete_page(0).unwrap();
+    let bytes = doc.save_to_vec().unwrap();
+    assert!(bytes.starts_with(b"%PDF"));
+    // Reload and verify
+    let doc2 = p.load_document(&bytes, None).unwrap();
+    assert_eq!(doc2.page_count(), original - 1);
+}
+
+#[test]
+#[ignore]
+fn save_to_vec_produces_valid_pdf() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let doc = p.load_document(hello_pdf(), None).unwrap();
+    let bytes = doc.save_to_vec().unwrap();
+    assert!(!bytes.is_empty(), "saved PDF should be non-empty");
+    assert!(
+        bytes.starts_with(b"%PDF"),
+        "saved PDF should start with %PDF header"
+    );
+}
+
+// --- delete_page / truncate PageRef preservation tests ---
+
+#[test]
+#[ignore]
+fn delete_page_preserves_later_page_refs() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 3, "need >= 3 pages, got {original}");
+    // Cache page at index 2
+    let r2 = doc.page(2).unwrap();
+    let w2 = doc.page_width(r2).unwrap();
+    // Delete page 0 (earlier page)
+    doc.delete_page(0).unwrap();
+    // r2 should still resolve (not Stale), and width should match
+    let w2_after = doc.page_width(r2).unwrap();
+    assert_eq!(
+        w2, w2_after,
+        "page width should be unchanged after earlier page deleted"
+    );
+}
+
+#[test]
+#[ignore]
+fn truncate_preserves_interior_page_refs() {
+    let p = Pdfium::open(pdfium_path()).unwrap();
+    let mut doc = p.load_document(born_digital_pdf(), None).unwrap();
+    let original = doc.page_count();
+    assert!(original >= 4, "need >= 4 pages, got {original}");
+    // Cache an interior page
+    let r = doc.page(2).unwrap();
+    let w = doc.page_width(r).unwrap();
+    // Truncate lead=1, trail=1
+    doc.truncate(1, 1).unwrap();
+    // The interior page ref should still be valid
+    let w_after = doc.page_width(r).unwrap();
+    assert_eq!(w, w_after, "interior page ref should survive truncation");
+    assert_eq!(doc.page_count(), original - 2);
 }
 
 // --- Re-export compile checks ---

@@ -142,4 +142,14 @@ mod tests {
     fn text_page_handle_exists() {
         let _: TextPageHandle;
     }
+
+    #[test]
+    fn fpdf_filewrite_type_exists() {
+        let fw = FPDF_FILEWRITE_ {
+            version: 1,
+            WriteBlock: None,
+        };
+        let _typed: FPDF_FILEWRITE = fw;
+        assert_eq!(_typed.version, 1);
+    }
 }

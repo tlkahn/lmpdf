@@ -10,6 +10,7 @@ pub enum Error {
     Handle(HandleError),
     Render(RenderError),
     Text(TextError),
+    Save(SaveError),
 }
 
 #[derive(Debug)]
@@ -25,6 +26,7 @@ pub enum DocumentError {
     IncorrectPassword,
     SecurityRestriction,
     IoError(String),
+    TruncationError(String),
 }
 
 #[derive(Debug)]
@@ -53,6 +55,12 @@ pub enum TextError {
     CharCountFailed,
 }
 
+#[derive(Debug)]
+pub enum SaveError {
+    WriteFailed,
+    IoError(String),
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -62,6 +70,7 @@ impl fmt::Display for Error {
             Error::Handle(e) => write!(f, "handle error: {e}"),
             Error::Render(e) => write!(f, "render error: {e}"),
             Error::Text(e) => write!(f, "text error: {e}"),
+            Error::Save(e) => write!(f, "save error: {e}"),
         }
     }
 }
@@ -83,6 +92,7 @@ impl fmt::Display for DocumentError {
             DocumentError::IncorrectPassword => write!(f, "incorrect password"),
             DocumentError::SecurityRestriction => write!(f, "unsupported security restriction"),
             DocumentError::IoError(s) => write!(f, "I/O error: {s}"),
+            DocumentError::TruncationError(s) => write!(f, "truncation error: {s}"),
         }
     }
 }
@@ -129,6 +139,15 @@ impl fmt::Display for TextError {
     }
 }
 
+impl fmt::Display for SaveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SaveError::WriteFailed => write!(f, "save write callback failed"),
+            SaveError::IoError(s) => write!(f, "I/O error: {s}"),
+        }
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl std::error::Error for Error {}
@@ -138,6 +157,7 @@ impl std::error::Error for PageError {}
 impl std::error::Error for HandleError {}
 impl std::error::Error for RenderError {}
 impl std::error::Error for TextError {}
+impl std::error::Error for SaveError {}
 
 impl From<LibraryError> for Error {
     fn from(e: LibraryError) -> Self {
@@ -172,6 +192,21 @@ impl From<RenderError> for Error {
 impl From<TextError> for Error {
     fn from(e: TextError) -> Self {
         Error::Text(e)
+    }
+}
+
+impl From<SaveError> for Error {
+    fn from(e: SaveError) -> Self {
+        Error::Save(e)
+    }
+}
+
+impl From<SysError> for SaveError {
+    fn from(e: SysError) -> Self {
+        match e {
+            SysError::Unknown => SaveError::WriteFailed,
+            other => SaveError::IoError(other.to_string()),
+        }
     }
 }
 
@@ -280,6 +315,7 @@ mod tests {
             DocumentError::IncorrectPassword.into(),
             DocumentError::SecurityRestriction.into(),
             DocumentError::IoError("test".into()).into(),
+            DocumentError::TruncationError("test".into()).into(),
             PageError::IndexOutOfBounds { index: 5, count: 3 }.into(),
             PageError::LoadFailed.into(),
             HandleError::CrossDocument.into(),
@@ -294,6 +330,8 @@ mod tests {
             RenderError::ConversionFailed.into(),
             TextError::LoadFailed.into(),
             TextError::CharCountFailed.into(),
+            SaveError::WriteFailed.into(),
+            SaveError::IoError("test".into()).into(),
         ];
         for e in cases {
             assert!(!e.to_string().is_empty());
@@ -322,6 +360,107 @@ mod tests {
         assert_error::<DocumentError>();
         assert_error::<PageError>();
         assert_error::<HandleError>();
+    }
+
+    #[test]
+    fn save_error_display() {
+        let e1 = SaveError::WriteFailed;
+        let e2 = SaveError::IoError("disk full".into());
+        assert!(e1.to_string().contains("write"));
+        assert!(e2.to_string().contains("disk full"));
+    }
+
+    #[test]
+    fn error_from_save_error() {
+        let e: Error = SaveError::WriteFailed.into();
+        assert!(matches!(e, Error::Save(SaveError::WriteFailed)));
+    }
+
+    #[test]
+    fn error_save_display() {
+        let e = Error::Save(SaveError::IoError("test".into()));
+        let s = e.to_string();
+        assert!(s.contains("save error"));
+        assert!(s.contains("test"));
+    }
+
+    #[test]
+    fn save_error_implements_std_error() {
+        fn assert_error<E: std::error::Error>() {}
+        assert_error::<SaveError>();
+    }
+
+    #[test]
+    fn save_error_from_sys_error() {
+        assert!(matches!(
+            SaveError::from(SysError::Unknown),
+            SaveError::WriteFailed
+        ));
+    }
+
+    #[test]
+    fn truncation_error_display() {
+        let e = DocumentError::TruncationError("too many pages".into());
+        let s = e.to_string();
+        assert!(
+            s.contains("truncation"),
+            "should contain 'truncation', got: {s}"
+        );
+        assert!(
+            s.contains("too many pages"),
+            "should contain message, got: {s}"
+        );
+        let e2: Error = DocumentError::TruncationError("x".into()).into();
+        assert!(matches!(
+            e2,
+            Error::Document(DocumentError::TruncationError(_))
+        ));
+    }
+
+    #[test]
+    fn save_error_from_sys_error_preserves_detail() {
+        let e = SaveError::from(SysError::FileNotFound);
+        assert!(
+            matches!(e, SaveError::IoError(ref s) if s.contains("file not found")),
+            "FileNotFound should map to IoError with detail, got: {e:?}"
+        );
+
+        let e2 = SaveError::from(SysError::InvalidFormat);
+        assert!(
+            matches!(e2, SaveError::IoError(ref s) if s.contains("invalid")),
+            "InvalidFormat should map to IoError with detail, got: {e2:?}"
+        );
+    }
+
+    #[test]
+    fn save_error_from_sys_error_all_variants() {
+        // Unknown -> WriteFailed (generic write failure)
+        assert!(matches!(
+            SaveError::from(SysError::Unknown),
+            SaveError::WriteFailed
+        ));
+
+        // All other variants -> IoError with descriptive message
+        let cases = vec![
+            SysError::FileNotFound,
+            SysError::InvalidFormat,
+            SysError::IncorrectPassword,
+            SysError::UnsupportedSecurity,
+            SysError::PageNotFound,
+            SysError::NullInterior("test".into()),
+            SysError::LoadFailed("lib".into()),
+        ];
+        for sys_err in cases {
+            let display = sys_err.to_string();
+            let save_err = SaveError::from(sys_err);
+            match save_err {
+                SaveError::IoError(ref s) => assert!(
+                    s.contains(&display) || display.contains(s),
+                    "IoError should carry source detail, got: {s}"
+                ),
+                other => panic!("expected IoError, got {other:?}"),
+            }
+        }
     }
 
     #[test]

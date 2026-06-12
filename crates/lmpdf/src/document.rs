@@ -6,10 +6,38 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use lmpdf_sys::{DocHandle, PageHandle, PdfiumLibrary};
 use slotmap::SlotMap;
 
+use std::os::raw::{c_int, c_ulong, c_void};
+
+use lmpdf_sys::FPDF_FILEWRITE_;
+
 use crate::Result;
 use crate::bitmap::Bitmap;
-use crate::error::{DocumentError, Error, HandleError, PageError, RenderError, TextError};
+use crate::error::{
+    DocumentError, Error, HandleError, PageError, RenderError, SaveError, TextError,
+};
 use crate::render::{RenderConfig, compute_target_dimensions};
+
+/// A wrapper that pairs an FPDF_FILEWRITE_ header with a pointer to a Vec<u8> buffer.
+/// Must be repr(C) so that casting *mut FPDF_FILEWRITE_ to *mut VecWriter
+/// recovers the `buf` field at the correct offset.
+#[repr(C)]
+struct VecWriter {
+    header: FPDF_FILEWRITE_,
+    buf: *mut Vec<u8>,
+}
+
+/// The extern "C" callback that Pdfium calls to write data.
+unsafe extern "C" fn write_block_callback(
+    self_: *mut FPDF_FILEWRITE_,
+    data: *const c_void,
+    size: c_ulong,
+) -> c_int {
+    let writer = self_ as *mut VecWriter;
+    let buf = unsafe { &mut *(*writer).buf };
+    let slice = unsafe { std::slice::from_raw_parts(data as *const u8, size as usize) };
+    buf.extend_from_slice(slice);
+    1 // success
+}
 
 static NEXT_DOC_ID: AtomicU64 = AtomicU64::new(1);
 
@@ -279,6 +307,81 @@ impl Document {
         Ok(map)
     }
 
+    pub fn delete_page(&mut self, index: usize) -> Result<()> {
+        if index >= self.page_count {
+            return Err(PageError::IndexOutOfBounds {
+                index,
+                count: self.page_count,
+            }
+            .into());
+        }
+
+        let map = self.page_index_map.get_mut();
+        let pages = self.pages.get_mut();
+        let bindings = self.lib.bindings();
+
+        // Close only the deleted page's cached handle (if any).
+        // Later pages' FPDF_PAGE handles remain valid (Pdfium page objects
+        // are independent of their index in the page tree); their slotmap
+        // keys are preserved so existing PageRefs stay usable.
+        if let Some(data) = map[index].and_then(|key| pages.remove(key)) {
+            bindings.close_page(data.handle);
+        }
+
+        // Remove the index entry (shifts subsequent entries left)
+        map.remove(index);
+
+        bindings.delete_page(self.handle, index as std::os::raw::c_int);
+        self.page_count -= 1;
+        Ok(())
+    }
+
+    pub fn truncate(&mut self, lead: usize, trail: usize) -> Result<()> {
+        if lead + trail >= self.page_count {
+            return Err(DocumentError::TruncationError(format!(
+                "lead ({lead}) + trail ({trail}) >= page_count ({})",
+                self.page_count
+            ))
+            .into());
+        }
+        // Delete trail pages from the end first (avoids index shifting issues)
+        for _ in 0..trail {
+            self.delete_page(self.page_count - 1)?;
+        }
+        // Delete lead pages back-to-front (avoids repeated O(n) Vec::remove(0) shifts)
+        for i in (0..lead).rev() {
+            self.delete_page(i)?;
+        }
+        Ok(())
+    }
+
+    pub fn save_to_vec(&self) -> Result<Vec<u8>> {
+        let mut output = Vec::new();
+        let mut writer = VecWriter {
+            header: FPDF_FILEWRITE_ {
+                version: 1,
+                WriteBlock: Some(write_block_callback),
+            },
+            buf: &mut output,
+        };
+
+        let bindings = self.lib.bindings();
+        // SAFETY: `writer` lives on this stack frame for the whole call;
+        // `header` is its first field (#[repr(C)]), so the pointer is valid
+        // for Pdfium's synchronous WriteBlock callback, which only runs
+        // before save_to_writer returns.
+        unsafe {
+            bindings.save_to_writer(
+                self.handle,
+                &mut writer.header as *mut FPDF_FILEWRITE_,
+                0, // flags: 0 = full save
+            )
+        }
+        .map_err(|e| Error::Save(SaveError::from(e)))?;
+
+        Ok(output)
+    }
+
     fn resolve_page(&self, r: PageRef) -> Result<PageData> {
         resolve_page_inner(self.id, &self.pages.borrow(), r)
     }
@@ -479,6 +582,57 @@ mod tests {
             doc.info()
         }
         let _ = assert_sig;
+    }
+
+    #[test]
+    fn delete_page_signature_exists() {
+        fn assert_sig(doc: &mut Document) -> Result<()> {
+            doc.delete_page(0_usize)
+        }
+        let _ = assert_sig;
+    }
+
+    #[test]
+    fn save_to_vec_signature_exists() {
+        fn assert_sig(doc: &Document) -> Result<Vec<u8>> {
+            doc.save_to_vec()
+        }
+        let _ = assert_sig;
+    }
+
+    #[test]
+    fn truncate_signature_exists() {
+        fn assert_sig(doc: &mut Document) -> Result<()> {
+            doc.truncate(1, 1)
+        }
+        let _ = assert_sig;
+    }
+
+    #[test]
+    fn truncate_too_many_pages_returns_error() {
+        fn assert_returns_err(doc: &mut Document) {
+            let result = doc.truncate(3, 3);
+            let _ = result;
+        }
+        let _ = assert_returns_err;
+    }
+
+    #[test]
+    fn truncate_zero_zero_is_noop() {
+        fn assert_ok(doc: &mut Document) {
+            let result = doc.truncate(0, 0);
+            let _ = result;
+        }
+        let _ = assert_ok;
+    }
+
+    #[test]
+    fn delete_page_out_of_bounds_returns_error() {
+        fn assert_returns_err(doc: &mut Document) {
+            let result = doc.delete_page(999);
+            let _ = result;
+        }
+        let _ = assert_returns_err;
     }
 
     #[test]
